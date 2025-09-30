@@ -70,6 +70,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse({status: 'promise_time_data_stored'});
         return true;
     }
+    
+    // Handle clearing notification tracking for testing
+    if (message.action === 'clearNotificationTracking') {
+        chrome.storage.local.remove(['lastNotificationCheck'], () => {
+            console.log('Background.js - Notification tracking cleared for testing');
+            sendResponse({status: 'notification_tracking_cleared'});
+        });
+        return true;
+    }
 });
 
 // ===============================
@@ -412,25 +421,36 @@ function getUrgencyLevel(timeRemaining) {
 
 // Check for Promise Time notifications
 function checkForPromiseTimeNotifications(activePromises) {
+    console.log('Background.js - Checking for notifications, active promises:', activePromises.length);
+    
     chrome.storage.local.get(['promiseTimeAlerts', 'lastNotificationCheck'], (result) => {
         const alertIntervals = result.promiseTimeAlerts || [60, 30, 10, 5, 1]; // Default intervals in minutes
         const lastCheck = result.lastNotificationCheck || {};
         const currentTime = Date.now();
         
+        console.log('Background.js - Alert intervals:', alertIntervals);
+        console.log('Background.js - Last notification check:', lastCheck);
+        
         activePromises.forEach(promise => {
-            const minutesRemaining = promise.timeRemaining / (1000 * 60);
+            const minutesRemaining = Math.floor(promise.timeRemaining / (1000 * 60));
             const roId = promise.roId;
             
+            console.log(`Background.js - Checking RO ${promise.repairOrderNumber}: ${minutesRemaining} minutes remaining`);
+            
             alertIntervals.forEach(interval => {
-                // Check if we need to show notification for this interval
-                if (minutesRemaining <= interval && minutesRemaining > (interval - 1)) {
-                    const notificationKey = `${roId}_${interval}`;
-                    
-                    // Only show if we haven't already notified for this RO and interval
-                    if (!lastCheck[notificationKey]) {
-                        showPromiseTimeNotification(promise, interval);
-                        lastCheck[notificationKey] = currentTime;
-                    }
+                // More flexible trigger logic - trigger when crossing the threshold
+                const shouldTrigger = minutesRemaining <= interval && minutesRemaining >= 0;
+                const notificationKey = `${roId}_${interval}`;
+                const alreadyNotified = lastCheck[notificationKey];
+                
+                console.log(`Background.js - Interval ${interval}: shouldTrigger=${shouldTrigger}, alreadyNotified=${!!alreadyNotified}`);
+                
+                if (shouldTrigger && !alreadyNotified) {
+                    console.log(`Background.js - TRIGGERING notification for RO ${promise.repairOrderNumber}: ${interval} minute alert`);
+                    showPromiseTimeNotification(promise, interval);
+                    lastCheck[notificationKey] = currentTime;
+                } else if (shouldTrigger && alreadyNotified) {
+                    console.log(`Background.js - Skipping notification for RO ${promise.repairOrderNumber}: ${interval} minute alert (already notified)`);
                 }
             });
         });
@@ -449,6 +469,8 @@ function checkForPromiseTimeNotifications(activePromises) {
 
 // Show Promise Time notification
 function showPromiseTimeNotification(promise, minutesRemaining) {
+    console.log(`Background.js - showPromiseTimeNotification called for RO ${promise.repairOrderNumber}: ${minutesRemaining} minutes`);
+    
     const title = `Promise Time Alert - RO #${promise.repairOrderNumber}`;
     let message;
     
@@ -462,15 +484,89 @@ function showPromiseTimeNotification(promise, minutesRemaining) {
         message = `📋 Promise time reminder: ${minutesRemaining} minutes remaining\nCustomer: ${promise.customerFullName}\nVehicle: ${promise.vehicleDescription}`;
     }
     
-    chrome.notifications.create(`promise_${promise.roId}_${minutesRemaining}`, {
+    const notificationId = `promise_${promise.roId}_${minutesRemaining}`;
+    console.log(`Background.js - Creating notification with ID: ${notificationId}`);
+    
+    chrome.notifications.create(notificationId, {
         type: 'basic',
         iconUrl: 'images/icon48.png',
         title: title,
         message: message,
-        priority: minutesRemaining <= 5 ? 2 : 1 // High priority for urgent notifications
+        priority: minutesRemaining <= 5 ? 2 : 1, // High priority for urgent notifications
+        requireInteraction: minutesRemaining <= 5 // Keep urgent notifications visible
+    }, (notificationId) => {
+        if (chrome.runtime.lastError) {
+            console.error('Background.js - Error creating notification:', chrome.runtime.lastError);
+        } else {
+            console.log(`Background.js - Notification created successfully: ${notificationId}`);
+            
+            // Add audio alert for urgent notifications
+            if (minutesRemaining <= 5) {
+                playAudioAlert(minutesRemaining);
+            }
+        }
     });
-    
-    console.log(`Background.js - Notification shown for RO ${promise.repairOrderNumber}: ${minutesRemaining} minutes remaining`);
+}
+
+// Play audio alert for urgent notifications
+function playAudioAlert(minutesRemaining) {
+    try {
+        // Create audio context for sound alerts
+        console.log(`Background.js - Playing audio alert for ${minutesRemaining} minutes remaining`);
+        
+        // Inject script into active tab to play audio (since service workers can't directly play audio)
+        chrome.tabs.query({active: true, currentWindow: true}, (tabs) => {
+            if (tabs.length > 0) {
+                chrome.scripting.executeScript({
+                    target: { tabId: tabs[0].id },
+                    func: (minutes) => {
+                        // Create audio context and play alert tone
+                        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                        
+                        // Play different tones based on urgency
+                        const frequencies = minutes <= 1 ? [800, 1000, 800, 1000] : [600, 800]; // More urgent = more beeps
+                        let beepIndex = 0;
+                        
+                        function playBeep(frequency, duration = 200) {
+                            const oscillator = audioContext.createOscillator();
+                            const gainNode = audioContext.createGain();
+                            
+                            oscillator.connect(gainNode);
+                            gainNode.connect(audioContext.destination);
+                            
+                            oscillator.frequency.value = frequency;
+                            oscillator.type = 'sine';
+                            
+                            gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+                            gainNode.gain.linearRampToValueAtTime(0.1, audioContext.currentTime + 0.01);
+                            gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + duration / 1000);
+                            
+                            oscillator.start(audioContext.currentTime);
+                            oscillator.stop(audioContext.currentTime + duration / 1000);
+                            
+                            return new Promise(resolve => {
+                                oscillator.onended = resolve;
+                            });
+                        }
+                        
+                        async function playSequence() {
+                            for (const freq of frequencies) {
+                                await playBeep(freq);
+                                await new Promise(resolve => setTimeout(resolve, 100)); // Short pause between beeps
+                            }
+                        }
+                        
+                        playSequence().catch(err => console.log('Audio alert error:', err));
+                    },
+                    args: [minutesRemaining]
+                }).catch(err => {
+                    console.log('Background.js - Could not play audio alert:', err);
+                });
+            }
+        });
+    } catch (error) {
+        console.log('Background.js - Audio alert error:', error);
+    }
 }
 
 // Handle notification clicks

@@ -67,12 +67,13 @@ function createPromiseTimeDashboardContent() {
     dashboardDiv.innerHTML = `
         <div id="dashboard-header">
                         <div style="display: flex; align-items: center; justify-content: flex-start; margin-bottom: 15px;">
-                <button id="backToConcernBtn" style="background-color: var(--accent-blue); color: white; border: none; padding: 6px; border-radius: var(--radius); cursor: pointer; transition: background-color 0.2s; font-size: 14px; line-height: 1; margin-right: 8px;">←</button>
-                <h2 style="color: var(--text-primary); margin: 0; font-size: 18px;">Promise Time Dashboard</h2>
+                <button id="backToConcernBtn" style="background-color: var(--accent-blue); color: white; border: none; padding: 4px 6px; border-radius: var(--radius); cursor: pointer; transition: background-color 0.2s; font-size: 12px; line-height: 1; margin-right: 6px; min-width: 24px;">←</button>
+                <h2 style="color: var(--text-primary); margin: 0; font-size: 16px; white-space: nowrap;">Promise Time Dashboard</h2>
             </div>
             <div style="display: flex; gap: 8px; margin-bottom: 20px;">
                 <button id="refreshDashboardBtn" style="background-color: var(--accent-green); color: white; border: none; padding: 8px 16px; border-radius: var(--radius); cursor: pointer; transition: background-color 0.2s;">🔄 Refresh</button>
                 <button id="scanCurrentPageBtn" style="background-color: var(--accent-blue); color: white; border: none; padding: 8px 16px; border-radius: var(--radius); cursor: pointer; transition: background-color 0.2s;">🔍 Scan Current Page</button>
+                <button id="testNotificationsBtn" style="background-color: #ff6b6b; color: white; border: none; padding: 8px 12px; border-radius: var(--radius); cursor: pointer; transition: background-color 0.2s; font-size: 12px;">🔔 Test</button>
             </div>
             <div id="dashboardCount" style="color: var(--text-muted); margin-bottom: 15px; font-size: 14px;">Loading...</div>
         </div>
@@ -89,6 +90,7 @@ function createPromiseTimeDashboardContent() {
         const backBtn = dashboardDiv.querySelector('#backToConcernBtn');
         const refreshBtn = dashboardDiv.querySelector('#refreshDashboardBtn');
         const scanBtn = dashboardDiv.querySelector('#scanCurrentPageBtn');
+        const testBtn = dashboardDiv.querySelector('#testNotificationsBtn');
         
         // Add hover effects
         backBtn?.addEventListener('mouseenter', (e) => e.target.style.backgroundColor = 'var(--accent-blue-hover)');
@@ -97,6 +99,8 @@ function createPromiseTimeDashboardContent() {
         refreshBtn?.addEventListener('mouseleave', (e) => e.target.style.backgroundColor = 'var(--accent-green)');
         scanBtn?.addEventListener('mouseenter', (e) => e.target.style.backgroundColor = 'var(--accent-blue-hover)');
         scanBtn?.addEventListener('mouseleave', (e) => e.target.style.backgroundColor = 'var(--accent-blue)');
+        testBtn?.addEventListener('mouseenter', (e) => e.target.style.backgroundColor = '#e53e3e');
+        testBtn?.addEventListener('mouseleave', (e) => e.target.style.backgroundColor = '#ff6b6b');
         
         backBtn?.addEventListener('click', closeDashboard);
         refreshBtn?.addEventListener('click', () => {
@@ -104,6 +108,18 @@ function createPromiseTimeDashboardContent() {
             loadDashboardData();
         });
         scanBtn?.addEventListener('click', scanCurrentPageForPromiseTime);
+        testBtn?.addEventListener('click', () => {
+            // Clear notification tracking and test notifications
+            chrome.runtime.sendMessage({ action: 'clearNotificationTracking' }, (response) => {
+                console.log('Notification tracking cleared:', response);
+                alert('Notification tracking cleared! The next dashboard refresh should trigger notifications for promise times under their alert thresholds.');
+                // Force refresh to trigger notifications
+                setTimeout(() => {
+                    chrome.runtime.sendMessage({ action: 'refreshPromiseDashboard' });
+                    loadDashboardData();
+                }, 500);
+            });
+        });
     }, 100);
     
     return dashboardDiv;
@@ -119,36 +135,42 @@ function closeDashboard() {
 }
 
 function loadDashboardData() {
-    chrome.storage.local.get(['promiseTimeDashboardData'], (result) => {
-        const dashboardData = result.promiseTimeDashboardData || [];
-        const listContainer = document.querySelector('#promise-dashboard-content #promiseTimeList');
-        const countElement = document.querySelector('#promise-dashboard-content #dashboardCount');
+    // First trigger a dashboard refresh to ensure we have the latest data
+    chrome.runtime.sendMessage({ action: 'refreshPromiseDashboard' }, (response) => {
+        console.log('loadDashboardData - Dashboard refresh response:', response);
         
-        if (!listContainer || !countElement) return;
-        
-        // Update count
-        countElement.textContent = dashboardData.length > 0 
-            ? `${dashboardData.length} active promise time${dashboardData.length === 1 ? '' : 's'}`
-            : 'No active promise times';
-        
-        // Clear existing items
-        listContainer.innerHTML = '';
-        
-        if (dashboardData.length === 0) {
-            listContainer.innerHTML = `
-                <div class="empty-dashboard" style="text-align: center; padding: 40px 20px; background-color: var(--bg-secondary); border-radius: var(--radius); border: 1px solid var(--border-color);">
-                    <h3 style="color: var(--text-secondary); margin-bottom: 15px;">No Active Promise Times</h3>
-                    <p style="color: var(--text-muted); margin-bottom: 10px;">Promise times will appear here when they are detected on Tekmetric repair order pages.</p>
-                    <p style="color: var(--text-muted); margin: 0; font-weight: 500;"><strong>Tip:</strong> Navigate to a repair order with a promise time set and click "Scan Current Page".</p>
-                </div>
-            `;
-            return;
-        }
-        
-        // Create items for each promise time (already sorted by urgency)
-        dashboardData.forEach(item => {
-            const promiseItem = createDashboardPromiseTimeItem(item);
-            listContainer.appendChild(promiseItem);
+        // Then load the refreshed data
+        chrome.storage.local.get(['promiseTimeDashboardData'], (result) => {
+            const dashboardData = result.promiseTimeDashboardData || [];
+            const listContainer = document.querySelector('#promise-dashboard-content #promiseTimeList');
+            const countElement = document.querySelector('#promise-dashboard-content #dashboardCount');
+            
+            if (!listContainer || !countElement) return;
+            
+            // Update count
+            countElement.textContent = dashboardData.length > 0 
+                ? `${dashboardData.length} active promise time${dashboardData.length === 1 ? '' : 's'}`
+                : 'No active promise times';
+            
+            // Clear existing items
+            listContainer.innerHTML = '';
+            
+            if (dashboardData.length === 0) {
+                listContainer.innerHTML = `
+                    <div class="empty-dashboard" style="text-align: center; padding: 40px 20px; background-color: var(--bg-secondary); border-radius: var(--radius); border: 1px solid var(--border-color);">
+                        <h3 style="color: var(--text-secondary); margin-bottom: 15px;">No Active Promise Times</h3>
+                        <p style="color: var(--text-muted); margin-bottom: 10px;">Promise times will appear here when they are detected on Tekmetric repair order pages.</p>
+                        <p style="color: var(--text-muted); margin: 0; font-weight: 500;"><strong>Tip:</strong> Navigate to a repair order with a promise time set and click "Scan Current Page".</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            // Create items for each promise time (already sorted by urgency)
+            dashboardData.forEach(item => {
+                const promiseItem = createDashboardPromiseTimeItem(item);
+                listContainer.appendChild(promiseItem);
+            });
         });
     });
 }
