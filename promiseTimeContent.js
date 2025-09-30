@@ -324,24 +324,45 @@
                 serviceWriter
             });
             
-            // Extract RO number from page title (e.g., "RO #001: Jay Demore's 2021 Chevrolet...")
+            // Extract RO number from page title - Tekmetric uses spans, not h1
             let repairOrderNumber = roId;
             try {
-                // First try to get from page title
-                const titleElement = document.querySelector('h1, [data-testid="repair-order-title"], .page-title');
-                if (titleElement) {
-                    const titleText = titleElement.textContent || titleElement.innerText || '';
-                    console.log('PromiseTimeContent.js - Page title for RO extraction:', titleText);
-                    
-                    const roMatch = titleText.match(/RO\s*#?(\w+):/);
-                    if (roMatch) {
-                        repairOrderNumber = roMatch[1];
-                        console.log('PromiseTimeContent.js - Extracted RO from title:', repairOrderNumber);
-                    } else {
-                        console.log('PromiseTimeContent.js - No RO match found in title:', titleText);
+                // First try to get from page title using span elements
+                const titleSelectors = [
+                    'span', // Tekmetric uses spans for titles
+                    'h1', 
+                    'h2', 
+                    'h3',
+                    '[data-testid*="repair-order-title"]', 
+                    '.page-title'
+                ];
+                
+                for (const selector of titleSelectors) {
+                    const elements = document.querySelectorAll(selector);
+                    for (const element of elements) {
+                        if (!element) continue;
+                        const titleText = element.textContent || element.innerText || '';
+                        
+                        // Check if this element contains the RO number
+                        if (titleText.includes('RO #') && titleText.includes('001')) {
+                            console.log('PromiseTimeContent.js - Found title element for RO:', element);
+                            console.log('PromiseTimeContent.js - Page title for RO extraction:', titleText);
+                            
+                            const roMatch = titleText.match(/RO\s*#?(\w+):/);
+                            if (roMatch) {
+                                repairOrderNumber = roMatch[1];
+                                console.log('PromiseTimeContent.js - Extracted RO from title:', repairOrderNumber);
+                                break;
+                            } else {
+                                console.log('PromiseTimeContent.js - No RO match found in title:', titleText);
+                            }
+                        }
                     }
-                } else {
-                    console.log('PromiseTimeContent.js - No title element found');
+                    if (repairOrderNumber !== roId) break; // Found it, stop searching
+                }
+                
+                if (repairOrderNumber === roId) {
+                    console.log('PromiseTimeContent.js - No title element found, using fallback');
                 }
                 
                 // Fallback to URL if title parsing fails
@@ -384,32 +405,53 @@
 
     function extractCustomerName() {
         try {
-            // First try to extract from page title (e.g., "RO #001: Jay Demore's 2021 Chevrolet...")
-            const titleElement = document.querySelector('h1, [data-testid="repair-order-title"], .page-title');
-            if (titleElement) {
-                const titleText = titleElement.textContent || titleElement.innerText || '';
-                console.log('PromiseTimeContent.js - Page title for customer extraction:', titleText);
-                
-                // Match pattern: "RO #001: Jay Demore's 2021..." 
-                // Test multiple patterns to be more robust
-                let customerMatch = titleText.match(/RO\s*#?\w+:\s*([^']+)'s?\s+\d{4}/);
-                if (!customerMatch) {
-                    // Try alternative pattern without 's
-                    customerMatch = titleText.match(/RO\s*#?\w+:\s*([^0-9]+?)\s+\d{4}/);
-                }
-                if (!customerMatch) {
-                    // Try even simpler pattern
-                    customerMatch = titleText.match(/:\s*([A-Za-z\s]+?)\s*\d{4}/);
-                }
-                
-                if (customerMatch) {
-                    let customerName = customerMatch[1].trim();
-                    // Clean up any extra text
-                    customerName = customerName.replace(/['s]+$/, '').trim();
-                    console.log('PromiseTimeContent.js - Extracted customer name:', customerName);
-                    return customerName;
-                } else {
-                    console.log('PromiseTimeContent.js - No customer match found for title:', titleText);
+            // First try to extract from page title - Tekmetric uses spans, not h1
+            const titleSelectors = [
+                'span', // Tekmetric uses spans for titles
+                'h1', 
+                'h2', 
+                'h3',
+                '[data-testid*="repair-order-title"]', 
+                '.page-title',
+                '.title',
+                '*[class*="title"]',
+                '*[class*="header"]'
+            ];
+            
+            for (const selector of titleSelectors) {
+                const elements = document.querySelectorAll(selector);
+                for (const element of elements) {
+                    if (!element) continue;
+                    const titleText = element.textContent || element.innerText || '';
+                    
+                    // Check if this element contains the RO and customer info
+                    if (titleText.includes('RO #') && titleText.includes('Jay') && titleText.includes('2021')) {
+                        console.log('PromiseTimeContent.js - Found title element:', element);
+                        console.log('PromiseTimeContent.js - Page title for customer extraction:', titleText);
+                        
+                        // Match pattern: "RO #001: Jay Demore's 2021..." 
+                        // Test multiple patterns to be more robust
+                        let customerMatch = titleText.match(/RO\s*#?\w+:\s*([^']+)'s?\s+\d{4}/);
+                        if (!customerMatch) {
+                            // Try alternative pattern without 's
+                            customerMatch = titleText.match(/RO\s*#?\w+:\s*([^0-9]+?)\s+\d{4}/);
+                        }
+                        if (!customerMatch) {
+                            // Try even simpler pattern
+                            customerMatch = titleText.match(/:\s*([A-Za-z\s]+?)\s*\d{4}/);
+                        }
+                        
+                        if (customerMatch) {
+                            let customerName = customerMatch[1].trim();
+                            // Clean up any extra text
+                            customerName = customerName.replace(/['s]+$/, '').trim();
+                            console.log('PromiseTimeContent.js - Extracted customer name:', customerName);
+                            return customerName;
+                        } else {
+                            console.log('PromiseTimeContent.js - No customer match found for title:', titleText);
+                        }
+                        break;
+                    }
                 }
             }
             
@@ -444,18 +486,44 @@
 
     function extractVehicleDescription() {
         try {
-            // First try to extract from page title (e.g., "RO #001: Jay Demore's 2021 Chevrolet Silverado 1500 RST")
-            const titleElement = document.querySelector('h1, [data-testid="repair-order-title"], .page-title');
-            if (titleElement) {
-                const titleText = titleElement.textContent || titleElement.innerText || '';
-                console.log('PromiseTimeContent.js - Page title for vehicle extraction:', titleText);
-                
-                // Match pattern: "RO #001: Jay Demore's 2021 Chevrolet Silverado 1500 RST"
-                const vehicleMatch = titleText.match(/RO\s*#?\w+:\s*[^']+['s]*\s+(\d{4}\s+.+?)(?:\s+Work Not Started|$)/);
-                if (vehicleMatch) {
-                    const vehicleDescription = vehicleMatch[1].trim();
-                    console.log('PromiseTimeContent.js - Extracted vehicle description:', vehicleDescription);
-                    return vehicleDescription;
+            // First try to extract from page title - Tekmetric uses spans, not h1
+            const titleSelectors = [
+                'span', // Tekmetric uses spans for titles
+                'h1', 
+                'h2', 
+                'h3',
+                '[data-testid*="repair-order-title"]', 
+                '.page-title'
+            ];
+            
+            for (const selector of titleSelectors) {
+                const elements = document.querySelectorAll(selector);
+                for (const element of elements) {
+                    if (!element) continue;
+                    const titleText = element.textContent || element.innerText || '';
+                    
+                    // Check if this element contains the RO and vehicle info
+                    if (titleText.includes('RO #') && titleText.includes('2021') && titleText.includes('Chevrolet')) {
+                        console.log('PromiseTimeContent.js - Found title element for vehicle:', element);
+                        console.log('PromiseTimeContent.js - Page title for vehicle extraction:', titleText);
+                        
+                        // Match pattern: "RO #001: Jay Demore's 2021 Chevrolet Silverado 1500 RST"
+                        const vehicleMatch = titleText.match(/\d{4}\s+(.+?)(?:\s+Work Not Started|$)/);
+                        if (vehicleMatch) {
+                            const vehicleDescription = vehicleMatch[1].trim();
+                            console.log('PromiseTimeContent.js - Extracted vehicle description:', vehicleDescription);
+                            return vehicleDescription;
+                        } else {
+                            // Try simpler pattern - everything after the year
+                            const simpleMatch = titleText.match(/(\d{4}.*?)(?:\s+Work|$)/);
+                            if (simpleMatch) {
+                                const vehicleDescription = simpleMatch[1].trim();
+                                console.log('PromiseTimeContent.js - Extracted vehicle (simple pattern):', vehicleDescription);
+                                return vehicleDescription;
+                            }
+                        }
+                        break;
+                    }
                 }
             }
             
