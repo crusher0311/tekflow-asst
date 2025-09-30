@@ -146,17 +146,30 @@
     // Section 5: Extract Promise Time Data from Current Page
     function extractPromiseTimeDataFromPage(shopId, roId, sendResponse) {
         try {
+            console.log('PromiseTimeContent.js - Starting extraction for shopId:', shopId, 'roId:', roId);
+            
             // Look for customer information
             const customerName = extractCustomerName();
             const vehicleDescription = extractVehicleDescription();
             const promiseTimeData = extractPromiseTimeFromPage();
             const serviceWriter = extractServiceWriter();
             
+            console.log('PromiseTimeContent.js - Extracted data:', {
+                customerName,
+                vehicleDescription,
+                promiseTimeData,
+                serviceWriter
+            });
+            
             // Extract RO number from URL if not provided
             let repairOrderNumber = roId;
-            const urlMatch = window.location.href.match(/repair-orders\/(\d+)/);
-            if (urlMatch) {
-                repairOrderNumber = urlMatch[1];
+            try {
+                const urlMatch = window.location.href.match(/repair-orders\/(\d+)/);
+                if (urlMatch) {
+                    repairOrderNumber = urlMatch[1];
+                }
+            } catch (urlError) {
+                console.log('PromiseTimeContent.js - Error parsing URL:', urlError);
             }
 
             if (promiseTimeData && promiseTimeData.timeOut) {
@@ -179,157 +192,211 @@
                 sendResponse({ success: false, message: 'No promise time found on this page' });
             }
         } catch (error) {
-            console.error('Error extracting promise time data:', error);
-            sendResponse({ success: false, message: 'Error extracting data: ' + error.message });
+            console.error('PromiseTimeContent.js - Error extracting promise time data:', error);
+            const errorMessage = error.message || error.toString();
+            sendResponse({ success: false, message: 'Error extracting data: ' + errorMessage });
         }
     }
 
     function extractCustomerName() {
-        // Look for customer name in various possible locations
-        const selectors = [
-            '*[data-testid*="customer"]',
-            '.customer-name',
-            '*:contains("Customer:")',
-            'h1, h2, h3'
-        ];
+        try {
+            // Look for customer name in various possible locations
+            const selectors = [
+                '*[data-testid*="customer"]',
+                '.customer-name',
+                '*:contains("Customer:")',
+                'h1, h2, h3'
+            ];
 
-        for (const selector of selectors) {
-            const elements = document.querySelectorAll(selector);
-            for (const el of elements) {
-                const text = el.textContent.trim();
-                if (text && text.length > 3 && !text.includes('RO') && !text.includes('Repair Order')) {
-                    return text;
+            for (const selector of selectors) {
+                try {
+                    const elements = document.querySelectorAll(selector);
+                    for (const el of elements) {
+                        if (!el) continue;
+                        const text = (el.textContent || el.innerText || '').trim();
+                        if (text && text.length > 3 && !text.includes('RO') && !text.includes('Repair Order')) {
+                            return text;
+                        }
+                    }
+                } catch (selectorError) {
+                    console.log('PromiseTimeContent.js - Error with selector:', selector, selectorError);
                 }
             }
+            return 'Unknown Customer';
+        } catch (error) {
+            console.log('PromiseTimeContent.js - Error extracting customer name:', error);
+            return 'Unknown Customer';
         }
-        return 'Unknown Customer';
     }
 
     function extractVehicleDescription() {
-        // Look for vehicle information
-        const selectors = [
-            '*[data-testid*="vehicle"]',
-            '.vehicle-info',
-            '*:contains("Year:")',
-            '*:contains("Make:")',
-            '*:contains("Model:")'
-        ];
+        try {
+            // Look for vehicle information
+            const selectors = [
+                '*[data-testid*="vehicle"]',
+                '.vehicle-info',
+                '*:contains("Year:")',
+                '*:contains("Make:")',
+                '*:contains("Model:")'
+            ];
 
-        let vehicleInfo = [];
-        for (const selector of selectors) {
-            const elements = document.querySelectorAll(selector);
-            for (const el of elements) {
-                const text = el.textContent.trim();
-                if (text && !vehicleInfo.includes(text) && text.length < 50) {
-                    vehicleInfo.push(text);
+            let vehicleInfo = [];
+            for (const selector of selectors) {
+                try {
+                    const elements = document.querySelectorAll(selector);
+                    for (const el of elements) {
+                        if (!el) continue;
+                        const text = (el.textContent || el.innerText || '').trim();
+                        if (text && !vehicleInfo.includes(text) && text.length < 50) {
+                            vehicleInfo.push(text);
+                        }
+                    }
+                } catch (selectorError) {
+                    console.log('PromiseTimeContent.js - Error with vehicle selector:', selector, selectorError);
                 }
             }
+            
+            return vehicleInfo.join(' ') || 'Unknown Vehicle';
+        } catch (error) {
+            console.log('PromiseTimeContent.js - Error extracting vehicle description:', error);
+            return 'Unknown Vehicle';
         }
-        
-        return vehicleInfo.join(' ') || 'Unknown Vehicle';
     }
 
     function extractPromiseTimeFromPage() {
-        console.log('PromiseTimeContent.js - Extracting promise time from page...');
-        
-        // Strategy 1: Look for existing promise time fields/values
-        const promiseTimeSelectors = [
-            'input[placeholder*="promise" i]',
-            'input[placeholder*="time out" i]', 
-            'input[name*="promise" i]',
-            'input[name*="timeout" i]',
-            '*[data-testid*="promise" i]',
-            '*[data-testid*="timeout" i]'
-        ];
-        
-        for (const selector of promiseTimeSelectors) {
-            const elements = document.querySelectorAll(selector);
-            for (const el of elements) {
-                const value = el.value || el.textContent || el.innerText;
-                console.log(`PromiseTimeContent.js - Checking element with selector "${selector}":`, value);
-                
-                if (value && value.trim()) {
-                    const timeOut = parseDateTime(value.trim());
-                    if (timeOut) {
-                        console.log('PromiseTimeContent.js - Found promise time via input field:', timeOut);
-                        return { timeOut: timeOut.toISOString() };
+        try {
+            console.log('PromiseTimeContent.js - Extracting promise time from page...');
+            
+            // Strategy 1: Look for existing promise time fields/values
+            const promiseTimeSelectors = [
+                'input[placeholder*="promise" i]',
+                'input[placeholder*="time out" i]', 
+                'input[name*="promise" i]',
+                'input[name*="timeout" i]',
+                '*[data-testid*="promise" i]',
+                '*[data-testid*="timeout" i]'
+            ];
+            
+            for (const selector of promiseTimeSelectors) {
+                try {
+                    const elements = document.querySelectorAll(selector);
+                    for (const el of elements) {
+                        if (!el) continue;
+                        const value = el.value || el.textContent || el.innerText || '';
+                        console.log(`PromiseTimeContent.js - Checking element with selector "${selector}":`, value);
+                        
+                        if (value && value.trim()) {
+                            const timeOut = parseDateTime(value.trim());
+                            if (timeOut) {
+                                console.log('PromiseTimeContent.js - Found promise time via input field:', timeOut);
+                                return { timeOut: timeOut.toISOString() };
+                            }
+                        }
                     }
+                } catch (selectorError) {
+                    console.log('PromiseTimeContent.js - Error with promise time selector:', selector, selectorError);
                 }
             }
-        }
-        
-        // Strategy 2: Look for text containing date/time patterns near "promise" keywords
-        const allElements = document.querySelectorAll('*');
-        const promiseKeywords = ['promise', 'promised', 'timeout', 'time out', 'due'];
-        
-        for (const el of allElements) {
-            const text = (el.textContent || '').toLowerCase();
-            const hasPromiseKeyword = promiseKeywords.some(keyword => text.includes(keyword));
             
-            if (hasPromiseKeyword || el.closest('[class*="promise" i]') || el.closest('[class*="timeout" i]')) {
-                // Look for date patterns in this element and nearby elements
-                const datePatterns = [
-                    /\d{1,2}\/\d{1,2}\/\d{4}\s+\d{1,2}:\d{2}(?:\s*[AP]M)?/gi,
-                    /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?(?:\.\d{3})?Z?/gi,
-                    /\w{3}\s+\w{3}\s+\d{1,2}\s+\d{4}\s+\d{1,2}:\d{2}/gi,
-                    /\d{1,2}-\d{1,2}-\d{4}\s+\d{1,2}:\d{2}(?:\s*[AP]M)?/gi
-                ];
+            // Strategy 2: Look for text containing date/time patterns near "promise" keywords
+            try {
+                const allElements = document.querySelectorAll('*');
+                const promiseKeywords = ['promise', 'promised', 'timeout', 'time out', 'due'];
                 
-                // Check current element and siblings
-                const elementsToCheck = [el, ...Array.from(el.parentElement?.children || [])];
-                
-                for (const checkEl of elementsToCheck) {
-                    const checkText = checkEl.textContent || checkEl.value || '';
+                for (const el of allElements) {
+                    if (!el || !el.textContent) continue;
                     
-                    for (const pattern of datePatterns) {
-                        const matches = checkText.match(pattern);
-                        if (matches) {
-                            for (const match of matches) {
-                                const timeOut = parseDateTime(match);
-                                if (timeOut && timeOut > new Date()) {
-                                    console.log('PromiseTimeContent.js - Found promise time via text pattern:', timeOut);
-                                    return { timeOut: timeOut.toISOString() };
+                    const text = el.textContent.toLowerCase();
+                    const hasPromiseKeyword = promiseKeywords.some(keyword => text.includes(keyword));
+                    
+                    if (hasPromiseKeyword || el.closest('[class*="promise" i]') || el.closest('[class*="timeout" i]')) {
+                        // Look for date patterns in this element and nearby elements
+                        const datePatterns = [
+                            /\d{1,2}\/\d{1,2}\/\d{4}\s+\d{1,2}:\d{2}(?:\s*[AP]M)?/gi,
+                            /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?(?:\.\d{3})?Z?/gi,
+                            /\w{3}\s+\w{3}\s+\d{1,2}\s+\d{4}\s+\d{1,2}:\d{2}/gi,
+                            /\d{1,2}-\d{1,2}-\d{4}\s+\d{1,2}:\d{2}(?:\s*[AP]M)?/gi
+                        ];
+                        
+                        // Check current element and siblings
+                        const elementsToCheck = [el];
+                        if (el.parentElement && el.parentElement.children) {
+                            elementsToCheck.push(...Array.from(el.parentElement.children));
+                        }
+                        
+                        for (const checkEl of elementsToCheck) {
+                            if (!checkEl) continue;
+                            const checkText = checkEl.textContent || checkEl.value || '';
+                            
+                            for (const pattern of datePatterns) {
+                                try {
+                                    const matches = checkText.match(pattern);
+                                    if (matches) {
+                                        for (const match of matches) {
+                                            const timeOut = parseDateTime(match);
+                                            if (timeOut && timeOut > new Date()) {
+                                                console.log('PromiseTimeContent.js - Found promise time via text pattern:', timeOut);
+                                                return { timeOut: timeOut.toISOString() };
+                                            }
+                                        }
+                                    }
+                                } catch (patternError) {
+                                    console.log('PromiseTimeContent.js - Error with pattern matching:', patternError);
                                 }
                             }
                         }
                     }
                 }
+            } catch (strategyError) {
+                console.log('PromiseTimeContent.js - Error in strategy 2:', strategyError);
             }
-        }
-        
-        // Strategy 3: Look for any future date/time on the page (less specific)
-        const timeElements = document.querySelectorAll('*');
-        
-        for (const el of timeElements) {
-            const text = el.textContent || el.value || '';
-            if (!text || text.length > 100) continue; // Skip very long text blocks
             
-            const dateTimePatterns = [
-                /\d{1,2}\/\d{1,2}\/\d{4}\s+\d{1,2}:\d{2}\s*[AP]M/gi,
-                /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/gi,
-                /\w{3}\s+\w{3}\s+\d{1,2}\s+\d{4}\s+\d{1,2}:\d{2}/gi
-            ];
-            
-            for (const pattern of dateTimePatterns) {
-                const matches = text.match(pattern);
-                if (matches) {
-                    for (const match of matches) {
-                        const timeOut = parseDateTime(match);
-                        if (timeOut && timeOut > new Date()) {
-                            // Only consider it if it's within a reasonable timeframe (next 30 days)
-                            const thirtyDaysFromNow = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-                            if (timeOut <= thirtyDaysFromNow) {
-                                console.log('PromiseTimeContent.js - Found potential promise time:', timeOut);
-                                return { timeOut: timeOut.toISOString() };
+            // Strategy 3: Look for any future date/time on the page (less specific)
+            try {
+                const timeElements = document.querySelectorAll('*');
+                
+                for (const el of timeElements) {
+                    if (!el || !el.textContent) continue;
+                    const text = el.textContent || el.value || '';
+                    if (!text || text.length > 100) continue; // Skip very long text blocks
+                    
+                    const dateTimePatterns = [
+                        /\d{1,2}\/\d{1,2}\/\d{4}\s+\d{1,2}:\d{2}\s*[AP]M/gi,
+                        /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/gi,
+                        /\w{3}\s+\w{3}\s+\d{1,2}\s+\d{4}\s+\d{1,2}:\d{2}/gi
+                    ];
+                    
+                    for (const pattern of dateTimePatterns) {
+                        try {
+                            const matches = text.match(pattern);
+                            if (matches) {
+                                for (const match of matches) {
+                                    const timeOut = parseDateTime(match);
+                                    if (timeOut && timeOut > new Date()) {
+                                        // Only consider it if it's within a reasonable timeframe (next 30 days)
+                                        const thirtyDaysFromNow = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+                                        if (timeOut <= thirtyDaysFromNow) {
+                                            console.log('PromiseTimeContent.js - Found potential promise time:', timeOut);
+                                            return { timeOut: timeOut.toISOString() };
+                                        }
+                                    }
+                                }
                             }
+                        } catch (patternError) {
+                            console.log('PromiseTimeContent.js - Error with general pattern:', patternError);
                         }
                     }
                 }
+            } catch (strategy3Error) {
+                console.log('PromiseTimeContent.js - Error in strategy 3:', strategy3Error);
             }
+            
+            console.log('PromiseTimeContent.js - No promise time found on page');
+            return null;
+        } catch (error) {
+            console.error('PromiseTimeContent.js - Error in extractPromiseTimeFromPage:', error);
+            return null;
         }
-        
-        console.log('PromiseTimeContent.js - No promise time found on page');
-        return null;
     }
 
     // Helper function to parse various date/time formats
@@ -372,25 +439,35 @@
     }
 
     function extractServiceWriter() {
-        // Look for service writer information
-        const selectors = [
-            '*[data-testid*="writer"]',
-            '*[data-testid*="advisor"]',
-            '.service-writer',
-            '*:contains("Service Writer:")',
-            '*:contains("Advisor:")'
-        ];
+        try {
+            // Look for service writer information
+            const selectors = [
+                '*[data-testid*="writer"]',
+                '*[data-testid*="advisor"]',
+                '.service-writer',
+                '*:contains("Service Writer:")',
+                '*:contains("Advisor:")'
+            ];
 
-        for (const selector of selectors) {
-            const elements = document.querySelectorAll(selector);
-            for (const el of elements) {
-                const text = el.textContent.trim();
-                if (text && text.length > 2 && text.length < 50) {
-                    return text.replace(/^(Service Writer:|Advisor:)\s*/i, '');
+            for (const selector of selectors) {
+                try {
+                    const elements = document.querySelectorAll(selector);
+                    for (const el of elements) {
+                        if (!el) continue;
+                        const text = (el.textContent || el.innerText || '').trim();
+                        if (text && text.length > 2 && text.length < 50) {
+                            return text.replace(/^(Service Writer:|Advisor:)\s*/i, '');
+                        }
+                    }
+                } catch (selectorError) {
+                    console.log('PromiseTimeContent.js - Error with service writer selector:', selector, selectorError);
                 }
             }
+            return 'Unknown Service Writer';
+        } catch (error) {
+            console.log('PromiseTimeContent.js - Error extracting service writer:', error);
+            return 'Unknown Service Writer';
         }
-        return 'Unknown Service Writer';
     }
 
     // Auto-start checking when script loads on repair order pages
