@@ -267,7 +267,58 @@
         try {
             console.log('PromiseTimeContent.js - Extracting promise time from page...');
             
-            // Strategy 1: Look for existing promise time fields/values
+            // Strategy 1: Look for "Promised Time Out" text specifically
+            const promisedTimeElements = Array.from(document.querySelectorAll('*')).filter(el => {
+                const text = (el.textContent || '').toLowerCase();
+                return text.includes('promised time out') || text.includes('promise time') || text.includes('promised time');
+            });
+            
+            console.log('PromiseTimeContent.js - Found promise time related elements:', promisedTimeElements.length);
+            
+            for (const el of promisedTimeElements) {
+                try {
+                    // Look in the same element and nearby elements for date/time
+                    const elementsToCheck = [
+                        el,
+                        el.nextElementSibling,
+                        el.nextElementSibling?.nextElementSibling,
+                        el.parentElement,
+                        ...Array.from(el.parentElement?.children || [])
+                    ].filter(Boolean);
+                    
+                    for (const checkEl of elementsToCheck) {
+                        if (!checkEl) continue;
+                        const text = checkEl.textContent || checkEl.value || '';
+                        console.log('PromiseTimeContent.js - Checking text near promised time:', text);
+                        
+                        // Look for specific patterns like "Tue, Sep 30 08:00 AM"
+                        const datePatterns = [
+                            /\w{3},?\s+\w{3}\s+\d{1,2}\s+\d{2}:\d{2}\s*[AP]M/gi, // "Tue, Sep 30 08:00 AM"
+                            /\w{3}\s+\w{3}\s+\d{1,2}\s+\d{4}\s+\d{1,2}:\d{2}\s*[AP]M/gi, // "Tue Sep 30 2025 08:00 AM"
+                            /\d{1,2}\/\d{1,2}\/\d{4}\s+\d{1,2}:\d{2}\s*[AP]M/gi, // "9/30/2025 08:00 AM"
+                            /\d{1,2}-\d{1,2}-\d{4}\s+\d{1,2}:\d{2}\s*[AP]M/gi, // "9-30-2025 08:00 AM"
+                        ];
+                        
+                        for (const pattern of datePatterns) {
+                            const matches = text.match(pattern);
+                            if (matches) {
+                                for (const match of matches) {
+                                    console.log('PromiseTimeContent.js - Found potential date match:', match);
+                                    const timeOut = parseDateTime(match);
+                                    if (timeOut && timeOut > new Date()) {
+                                        console.log('PromiseTimeContent.js - Successfully parsed promise time:', timeOut);
+                                        return { timeOut: timeOut.toISOString() };
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } catch (elementError) {
+                    console.log('PromiseTimeContent.js - Error checking promise time element:', elementError);
+                }
+            }
+            
+            // Strategy 2: Look for existing promise time fields/values
             const promiseTimeSelectors = [
                 'input[placeholder*="promise" i]',
                 'input[placeholder*="time out" i]', 
@@ -298,7 +349,7 @@
                 }
             }
             
-            // Strategy 2: Look for text containing date/time patterns near "promise" keywords
+            // Strategy 3: Look for text containing date/time patterns near "promise" keywords
             try {
                 const allElements = document.querySelectorAll('*');
                 const promiseKeywords = ['promise', 'promised', 'timeout', 'time out', 'due'];
@@ -348,10 +399,10 @@
                     }
                 }
             } catch (strategyError) {
-                console.log('PromiseTimeContent.js - Error in strategy 2:', strategyError);
+                console.log('PromiseTimeContent.js - Error in strategy 3:', strategyError);
             }
             
-            // Strategy 3: Look for any future date/time on the page (less specific)
+            // Strategy 4: Look for any future date/time on the page (less specific)
             try {
                 const timeElements = document.querySelectorAll('*');
                 
@@ -361,6 +412,7 @@
                     if (!text || text.length > 100) continue; // Skip very long text blocks
                     
                     const dateTimePatterns = [
+                        /\w{3},?\s+\w{3}\s+\d{1,2}\s+\d{2}:\d{2}\s*[AP]M/gi, // "Tue, Sep 30 08:00 AM"
                         /\d{1,2}\/\d{1,2}\/\d{4}\s+\d{1,2}:\d{2}\s*[AP]M/gi,
                         /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/gi,
                         /\w{3}\s+\w{3}\s+\d{1,2}\s+\d{4}\s+\d{1,2}:\d{2}/gi
@@ -387,8 +439,8 @@
                         }
                     }
                 }
-            } catch (strategy3Error) {
-                console.log('PromiseTimeContent.js - Error in strategy 3:', strategy3Error);
+            } catch (strategy4Error) {
+                console.log('PromiseTimeContent.js - Error in strategy 4:', strategy4Error);
             }
             
             console.log('PromiseTimeContent.js - No promise time found on page');
@@ -404,9 +456,47 @@
         try {
             // Remove extra whitespace
             dateStr = dateStr.trim();
+            console.log('PromiseTimeContent.js - Attempting to parse:', dateStr);
             
             // Try different parsing approaches
             const parseAttempts = [
+                () => {
+                    // Handle "Tue, Sep 30 08:00 AM" format specifically
+                    const shortFormatMatch = dateStr.match(/(\w{3}),?\s+(\w{3})\s+(\d{1,2})\s+(\d{1,2}):(\d{2})\s*([AP]M)?/i);
+                    if (shortFormatMatch) {
+                        const [, dayOfWeek, month, day, hour, minute, ampm] = shortFormatMatch;
+                        
+                        // Map month abbreviations
+                        const monthMap = {
+                            'jan': 0, 'feb': 1, 'mar': 2, 'apr': 3, 'may': 4, 'jun': 5,
+                            'jul': 6, 'aug': 7, 'sep': 8, 'oct': 9, 'nov': 10, 'dec': 11
+                        };
+                        
+                        const monthNum = monthMap[month.toLowerCase()];
+                        if (monthNum !== undefined) {
+                            let hour24 = parseInt(hour);
+                            if (ampm) {
+                                if (ampm.toLowerCase() === 'pm' && hour24 !== 12) hour24 += 12;
+                                if (ampm.toLowerCase() === 'am' && hour24 === 12) hour24 = 0;
+                            }
+                            
+                            // Use current year and month logic to determine the correct year
+                            const now = new Date();
+                            let year = now.getFullYear();
+                            
+                            // If the month/day has passed this year, assume next year
+                            const testDate = new Date(year, monthNum, parseInt(day), hour24, parseInt(minute));
+                            if (testDate < now) {
+                                year += 1;
+                            }
+                            
+                            const result = new Date(year, monthNum, parseInt(day), hour24, parseInt(minute));
+                            console.log('PromiseTimeContent.js - Parsed short format:', result);
+                            return result;
+                        }
+                    }
+                    return null;
+                },
                 () => new Date(dateStr),
                 () => new Date(dateStr.replace(/(\d{1,2})\/(\d{1,2})\/(\d{4})/, '$3-$1-$2')),
                 () => new Date(dateStr.replace(/(\d{1,2})-(\d{1,2})-(\d{4})/, '$3-$1-$2')),
@@ -427,10 +517,12 @@
             for (const attempt of parseAttempts) {
                 const result = attempt();
                 if (result && !isNaN(result.getTime())) {
+                    console.log('PromiseTimeContent.js - Successfully parsed date:', result);
                     return result;
                 }
             }
             
+            console.log('PromiseTimeContent.js - Failed to parse date:', dateStr);
             return null;
         } catch (error) {
             console.log('PromiseTimeContent.js - Error parsing date:', dateStr, error);

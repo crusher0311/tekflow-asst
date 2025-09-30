@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "TekFlow Assistant",
-  "version": "0.2.6",
-  "description": "Side Panel Production",
+  "version": "0.2.7",
+  "description": "Enhanced Tekmetric workflow assistant with customer concern management and promise time monitoring",
   "permissions": [
     "sidePanel",
     "storage",
