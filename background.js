@@ -277,8 +277,8 @@ function startTimeoutCheck(customerTimeOut) {
                 chrome.windows.create({
                     url: 'promiseTimePopup.html',
                     type: 'popup',
-                    width: 400,
-                    height: 300
+                    width: 500,
+                    height: 450
                 });
             } else {
                 intervals.forEach((interval, index) => {
@@ -288,8 +288,8 @@ function startTimeoutCheck(customerTimeOut) {
                         chrome.windows.create({
                             url: 'promiseTimePopup.html',
                             type: 'popup',
-                            width: 400,
-                            height: 300
+                            width: 500,
+                            height: 450
                         });
                     }
                 });
