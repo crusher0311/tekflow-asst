@@ -63,6 +63,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse({status: 'dashboard_refreshed'});
         return true;
     }
+    
+    // Handle storing promise time data from page scanning
+    if (message.action === 'storePromiseTimeData') {
+        storePromiseTimeData(message.data);
+        sendResponse({status: 'promise_time_data_stored'});
+        return true;
+    }
 });
 
 // ===============================
@@ -312,6 +319,35 @@ function addToPromiseTimeTracking(roData) {
     });
 }
 
+// Store promise time data extracted from page scanning
+function storePromiseTimeData(data) {
+    console.log("Background.js - Storing promise time data from page:", data);
+    
+    // Create a properly formatted RO data object
+    const roData = {
+        customerTimeOut: data.customerTimeOut,
+        customerFullName: data.customerFullName,
+        vehicleDescription: data.vehicleDescription,
+        repairOrderNumber: data.repairOrderNumber,
+        serviceWriterName: data.serviceWriterName,
+        shopId: data.shopId,
+        roId: data.roId,
+        lastUpdated: new Date().toISOString()
+    };
+    
+    // Add to tracking system
+    addToPromiseTimeTracking(roData);
+    
+    // Also store in individual storage for sidepanel monitor
+    chrome.storage.local.set({
+        customerTimeOut: data.customerTimeOut,
+        customerFullName: data.customerFullName,
+        vehicleDescription: data.vehicleDescription,
+        repairOrderNumber: data.repairOrderNumber,
+        roId: data.roId
+    });
+}
+
 // Remove RO from Promise Time tracking (when timeout expires or is cancelled)
 function removeFromPromiseTimeTracking(roId) {
     chrome.storage.local.get(['promiseTimeTracking'], (result) => {
@@ -357,6 +393,9 @@ function updatePromiseTimeDashboard() {
             promiseTimeTracking: cleanedTracking,
             promiseTimeDashboardData: activePromises 
         });
+        
+        // Check for notifications
+        checkForPromiseTimeNotifications(activePromises);
     });
 }
 
@@ -368,6 +407,94 @@ function getUrgencyLevel(timeRemaining) {
     if (minutes <= 60) return 'warning';
     return 'safe';
 }
+
+// Check for Promise Time notifications
+function checkForPromiseTimeNotifications(activePromises) {
+    chrome.storage.local.get(['promiseTimeAlerts', 'lastNotificationCheck'], (result) => {
+        const alertIntervals = result.promiseTimeAlerts || [60, 30, 10, 5, 1]; // Default intervals in minutes
+        const lastCheck = result.lastNotificationCheck || {};
+        const currentTime = Date.now();
+        
+        activePromises.forEach(promise => {
+            const minutesRemaining = promise.timeRemaining / (1000 * 60);
+            const roId = promise.roId;
+            
+            alertIntervals.forEach(interval => {
+                // Check if we need to show notification for this interval
+                if (minutesRemaining <= interval && minutesRemaining > (interval - 1)) {
+                    const notificationKey = `${roId}_${interval}`;
+                    
+                    // Only show if we haven't already notified for this RO and interval
+                    if (!lastCheck[notificationKey]) {
+                        showPromiseTimeNotification(promise, interval);
+                        lastCheck[notificationKey] = currentTime;
+                    }
+                }
+            });
+        });
+        
+        // Clean up old notification tracking (older than 24 hours)
+        const dayOld = currentTime - (24 * 60 * 60 * 1000);
+        Object.keys(lastCheck).forEach(key => {
+            if (lastCheck[key] < dayOld) {
+                delete lastCheck[key];
+            }
+        });
+        
+        chrome.storage.local.set({ lastNotificationCheck: lastCheck });
+    });
+}
+
+// Show Promise Time notification
+function showPromiseTimeNotification(promise, minutesRemaining) {
+    const title = `Promise Time Alert - RO #${promise.repairOrderNumber}`;
+    let message;
+    
+    if (minutesRemaining <= 1) {
+        message = `⚠️ URGENT: Promise time expires in 1 minute or less!\nCustomer: ${promise.customerFullName}\nVehicle: ${promise.vehicleDescription}`;
+    } else if (minutesRemaining <= 5) {
+        message = `🚨 Promise time expires in ${minutesRemaining} minutes!\nCustomer: ${promise.customerFullName}\nVehicle: ${promise.vehicleDescription}`;
+    } else if (minutesRemaining <= 10) {
+        message = `⏰ Promise time expires in ${minutesRemaining} minutes\nCustomer: ${promise.customerFullName}\nVehicle: ${promise.vehicleDescription}`;
+    } else {
+        message = `📋 Promise time reminder: ${minutesRemaining} minutes remaining\nCustomer: ${promise.customerFullName}\nVehicle: ${promise.vehicleDescription}`;
+    }
+    
+    chrome.notifications.create(`promise_${promise.roId}_${minutesRemaining}`, {
+        type: 'basic',
+        iconUrl: 'images/icon48.png',
+        title: title,
+        message: message,
+        priority: minutesRemaining <= 5 ? 2 : 1 // High priority for urgent notifications
+    });
+    
+    console.log(`Background.js - Notification shown for RO ${promise.repairOrderNumber}: ${minutesRemaining} minutes remaining`);
+}
+
+// Handle notification clicks
+chrome.notifications.onClicked.addListener((notificationId) => {
+    if (notificationId.startsWith('promise_')) {
+        // Extract RO ID from notification ID
+        const parts = notificationId.split('_');
+        const roId = parts[1];
+        
+        // Find the RO data to get shop ID
+        chrome.storage.local.get(['promiseTimeTracking'], (result) => {
+            const tracking = result.promiseTimeTracking || [];
+            const roData = tracking.find(item => item.roId === roId);
+            
+            if (roData && roData.shopId) {
+                // Open the repair order in Tekmetric
+                chrome.tabs.create({
+                    url: `https://shop.tekmetric.com/admin/shop/${roData.shopId}/repair-orders/${roId}/estimate`
+                });
+            }
+        });
+        
+        // Clear the notification
+        chrome.notifications.clear(notificationId);
+    }
+});
 
 // Periodic dashboard update
 setInterval(updatePromiseTimeDashboard, 60000); // Update every minute

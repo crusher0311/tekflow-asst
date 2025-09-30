@@ -23,7 +23,28 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Initialize Promise Time Dashboard
     initializePromiseTimeDashboard();
+    
+    // Add event listener for Promise Time Dashboard button
+    const promiseTimeDashboardBtn = document.getElementById('promiseTimeDashboardBtn');
+    if (promiseTimeDashboardBtn) {
+        promiseTimeDashboardBtn.addEventListener('click', openPromiseTimeDashboard);
+    }
 });
+
+// ===============================
+// PROMISE TIME DASHBOARD POPUP
+// ===============================
+
+function openPromiseTimeDashboard() {
+    // Open the Promise Time Dashboard in a new popup window
+    chrome.windows.create({
+        url: chrome.runtime.getURL('promiseTimeDashboard.html'),
+        type: 'popup',
+        width: 650,
+        height: 700,
+        focused: true
+    });
+}
 
 // ===============================
 // PROMISE TIME MONITORING

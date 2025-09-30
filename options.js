@@ -239,10 +239,7 @@ ASSISTANT OUTPUT:
     });
 
     // Load saved warning intervals for Promise Time
-    chrome.storage.sync.get(['warningIntervals'], (data) => {
-        const intervals = data.warningIntervals || [60, 1]; // Default intervals: 60 minutes and 1 minute
-        intervals.forEach(addIntervalInput);
-    });
+    loadPromiseTimeAlerts();
 });
 
 // Save theme option
@@ -287,52 +284,180 @@ document.getElementById('saveProxyButton').addEventListener('click', function() 
 // PROMISE TIME FUNCTIONALITY
 // ===============================
 
-// Add interval input for Promise Time alerts
-function addIntervalInput(value = '') {
+let currentEditingIndex = -1; // Track which alert is being edited
+
+// Load and display Promise Time alerts
+function loadPromiseTimeAlerts() {
+    chrome.storage.local.get(['promiseTimeAlerts'], (data) => {
+        const alerts = data.promiseTimeAlerts || [60, 30, 10, 5, 1]; // Default intervals in minutes
+        displayAlertIntervals(alerts);
+    });
+}
+
+// Display alert intervals with enhanced UI
+function displayAlertIntervals(intervals) {
     const intervalList = document.getElementById('intervalList');
-    const intervalDiv = document.createElement('div');
-    intervalDiv.className = 'interval-input-container';
-    intervalDiv.style.marginBottom = '5px';
+    intervalList.innerHTML = '';
 
-    const intervalInput = document.createElement('input');
-    intervalInput.type = 'number';
-    intervalInput.className = 'interval-input';
-    intervalInput.placeholder = 'Enter minutes';
-    intervalInput.value = value;
-    intervalInput.style.marginRight = '10px';
-    intervalInput.style.width = '100px';
+    intervals.forEach((minutes, index) => {
+        const intervalDiv = document.createElement('div');
+        intervalDiv.className = 'interval-item';
 
-    const removeButton = document.createElement('button');
-    removeButton.textContent = 'Remove';
-    removeButton.style.fontSize = '12px';
-    removeButton.style.padding = '2px 6px';
-    removeButton.addEventListener('click', () => {
-        intervalList.removeChild(intervalDiv);
-    });
-
-    intervalDiv.appendChild(intervalInput);
-    intervalDiv.appendChild(removeButton);
-    intervalList.appendChild(intervalDiv);
-}
-
-// Save Promise Time warning intervals
-function saveIntervals() {
-    const intervalInputs = document.querySelectorAll('.interval-input');
-    const intervals = Array.from(intervalInputs).map(input => parseInt(input.value, 10)).filter(value => !isNaN(value) && value > 0);
-
-    chrome.storage.sync.set({ warningIntervals: intervals }, () => {
-        const saveBtn = document.getElementById('saveIntervals');
-        const originalText = saveBtn.textContent;
-        saveBtn.textContent = 'Intervals Saved!';
-        saveBtn.style.backgroundColor = 'var(--accent-green)';
+        const timeText = formatTimeFromMinutes(minutes);
         
-        setTimeout(() => {
-            saveBtn.textContent = originalText;
-            saveBtn.style.backgroundColor = '';
-        }, 1500);
+        intervalDiv.innerHTML = `
+            <div class="interval-time">${timeText} before timeout</div>
+            <div class="interval-actions">
+                <button class="alert-button" onclick="editAlert(${index})">Edit</button>
+                <button class="remove-button" onclick="removeAlert(${index})">Remove</button>
+            </div>
+        `;
+
+        intervalList.appendChild(intervalDiv);
     });
 }
+
+// Format minutes into readable time format
+function formatTimeFromMinutes(totalMinutes) {
+    const days = Math.floor(totalMinutes / (24 * 60));
+    const hours = Math.floor((totalMinutes % (24 * 60)) / 60);
+    const minutes = totalMinutes % 60;
+
+    const parts = [];
+    if (days > 0) parts.push(`${days} day${days !== 1 ? 's' : ''}`);
+    if (hours > 0) parts.push(`${hours} hour${hours !== 1 ? 's' : ''}`);
+    if (minutes > 0) parts.push(`${minutes} minute${minutes !== 1 ? 's' : ''}`);
+
+    return parts.join(', ') || '0 minutes';
+}
+
+// Convert days, hours, minutes to total minutes
+function convertToMinutes(days, hours, minutes) {
+    return (days * 24 * 60) + (hours * 60) + minutes;
+}
+
+// Open modal for adding new alert
+function addNewAlert() {
+    currentEditingIndex = -1;
+    document.getElementById('modalTitle').textContent = 'Add New Alert';
+    document.getElementById('alertDays').value = 0;
+    document.getElementById('alertHours').value = 0;
+    document.getElementById('alertMinutes').value = 1;
+    showModal();
+}
+
+// Open modal for editing existing alert
+function editAlert(index) {
+    chrome.storage.local.get(['promiseTimeAlerts'], (data) => {
+        const alerts = data.promiseTimeAlerts || [];
+        const minutes = alerts[index];
+        
+        currentEditingIndex = index;
+        document.getElementById('modalTitle').textContent = 'Edit Alert Time';
+        
+        // Convert total minutes back to days, hours, minutes
+        const days = Math.floor(minutes / (24 * 60));
+        const hours = Math.floor((minutes % (24 * 60)) / 60);
+        const remainingMinutes = minutes % 60;
+        
+        document.getElementById('alertDays').value = days;
+        document.getElementById('alertHours').value = hours;
+        document.getElementById('alertMinutes').value = remainingMinutes;
+        
+        showModal();
+    });
+}
+
+// Remove alert from list
+function removeAlert(index) {
+    chrome.storage.local.get(['promiseTimeAlerts'], (data) => {
+        const alerts = data.promiseTimeAlerts || [];
+        alerts.splice(index, 1);
+        chrome.storage.local.set({ promiseTimeAlerts: alerts }, () => {
+            loadPromiseTimeAlerts();
+        });
+    });
+}
+
+// Show modal
+function showModal() {
+    document.getElementById('alertTimeModal').style.display = 'block';
+}
+
+// Hide modal
+function hideModal() {
+    document.getElementById('alertTimeModal').style.display = 'none';
+}
+
+// Save alert time from modal
+function saveAlertTime() {
+    const days = parseInt(document.getElementById('alertDays').value) || 0;
+    const hours = parseInt(document.getElementById('alertHours').value) || 0;
+    const minutes = parseInt(document.getElementById('alertMinutes').value) || 0;
+    
+    const totalMinutes = convertToMinutes(days, hours, minutes);
+    
+    if (totalMinutes <= 0) {
+        alert('Please enter a valid time greater than 0.');
+        return;
+    }
+    
+    chrome.storage.local.get(['promiseTimeAlerts'], (data) => {
+        let alerts = data.promiseTimeAlerts || [];
+        
+        if (currentEditingIndex >= 0) {
+            // Edit existing alert
+            alerts[currentEditingIndex] = totalMinutes;
+        } else {
+            // Add new alert
+            alerts.push(totalMinutes);
+        }
+        
+        // Sort alerts in descending order (longest time first)
+        alerts.sort((a, b) => b - a);
+        
+        chrome.storage.local.set({ promiseTimeAlerts: alerts }, () => {
+            loadPromiseTimeAlerts();
+            hideModal();
+            
+            // Show success message
+            const saveBtn = document.getElementById('saveIntervals');
+            if (saveBtn) {
+                const originalText = saveBtn.textContent;
+                saveBtn.textContent = 'Alert Saved!';
+                saveBtn.style.backgroundColor = 'var(--accent-green)';
+                
+                setTimeout(() => {
+                    saveBtn.textContent = originalText;
+                    saveBtn.style.backgroundColor = '';
+                }, 1500);
+            }
+        });
+    });
+}
+
+// Make functions globally available
+window.editAlert = editAlert;
+window.removeAlert = removeAlert;
 
 // Event listeners for Promise Time functionality
-document.getElementById('addInterval').addEventListener('click', () => addIntervalInput());
-document.getElementById('saveIntervals').addEventListener('click', saveIntervals);
+document.getElementById('addInterval').addEventListener('click', addNewAlert);
+
+// Modal event listeners
+document.getElementById('closeModal').addEventListener('click', hideModal);
+document.getElementById('cancelAlert').addEventListener('click', hideModal);
+document.getElementById('saveAlertTime').addEventListener('click', saveAlertTime);
+
+// Close modal when clicking outside
+window.addEventListener('click', (event) => {
+    const modal = document.getElementById('alertTimeModal');
+    if (event.target === modal) {
+        hideModal();
+    }
+});
+
+// Save intervals button (legacy compatibility)
+document.getElementById('saveIntervals').addEventListener('click', () => {
+    // Just reload to show current state
+    loadPromiseTimeAlerts();
+});

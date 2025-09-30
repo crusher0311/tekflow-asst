@@ -91,12 +91,43 @@
         <!-- Promise Time Alerts Section -->
         <div class="options-section" id="promise-time-section">
             <h2>Promise Time Alerts</h2>
-            <p>Configure when to receive alerts before customer promise times expire. Alerts will appear as popup windows.</p>
-            <label>Warning Intervals (minutes before timeout):</label>
+            <p>Configure when to receive alerts before customer promise times expire. Alerts will appear as popup notifications.</p>
+            <label>Alert Intervals:</label>
             <div id="intervalList"></div>
             <div class="button-container">
-                <button id="addInterval">Add Interval</button>
+                <button id="addInterval">Add New Alert</button>
                 <button id="saveIntervals">Save Intervals</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alert Time Modal -->
+    <div id="alertTimeModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modalTitle">Set Alert Time</h3>
+                <span class="close" id="closeModal">&times;</span>
+            </div>
+            <div class="modal-body">
+                <p>Configure when to show this alert before the promise time expires:</p>
+                <div class="time-input-grid">
+                    <div class="time-input-group">
+                        <label for="alertDays">Days:</label>
+                        <input type="number" id="alertDays" min="0" max="30" value="0">
+                    </div>
+                    <div class="time-input-group">
+                        <label for="alertHours">Hours:</label>
+                        <input type="number" id="alertHours" min="0" max="23" value="0">
+                    </div>
+                    <div class="time-input-group">
+                        <label for="alertMinutes">Minutes:</label>
+                        <input type="number" id="alertMinutes" min="0" max="59" value="1">
+                    </div>
+                </div>
+                <div class="modal-buttons">
+                    <button id="saveAlertTime" class="save-button">Save Alert</button>
+                    <button id="cancelAlert" class="cancel-button">Cancel</button>
+                </div>
             </div>
         </div>
     </div>
