@@ -506,3 +506,114 @@ textarea {
     margin-right: 0;
   }
 }
+
+/* Promise Time Dashboard Styles */
+#promise-time-dashboard {
+  margin-top: 15px;
+}
+
+#promiseTimeList {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.promise-item {
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  padding: 12px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.promise-item:hover {
+  background-color: var(--bg-secondary);
+  border-color: var(--accent-blue);
+}
+
+.promise-item.urgent {
+  border-left: 4px solid #ff6b6b;
+  background-color: rgba(255, 107, 107, 0.1);
+}
+
+.promise-item.warning {
+  border-left: 4px solid #ffa726;
+  background-color: rgba(255, 167, 38, 0.1);
+}
+
+.promise-item.safe {
+  border-left: 4px solid var(--accent-green);
+  background-color: rgba(56, 161, 105, 0.1);
+}
+
+.promise-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.promise-ro {
+  font-weight: bold;
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+.promise-time {
+  font-size: 12px;
+  font-weight: bold;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.promise-time.urgent {
+  color: white;
+  background-color: #ff6b6b;
+}
+
+.promise-time.warning {
+  color: white;
+  background-color: #ffa726;
+}
+
+.promise-time.safe {
+  color: white;
+  background-color: var(--accent-green);
+}
+
+.promise-customer {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+
+.promise-vehicle {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.empty-dashboard {
+  text-align: center;
+  padding: 20px;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+#refreshDashboardButton {
+  background-color: var(--accent-blue);
+  color: white;
+  border: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-size: 12px;
+  transition: background-color 0.2s ease;
+}
+
+#refreshDashboardButton:hover {
+  background-color: var(--accent-blue-hover);
+}
+
+#dashboardCount {
+  color: var(--text-muted);
+}

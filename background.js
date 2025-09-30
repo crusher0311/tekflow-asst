@@ -56,6 +56,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             }
         });
     }
+    
+    // Handle Promise Time Dashboard refresh
+    if (message.action === 'refreshPromiseDashboard') {
+        updatePromiseTimeDashboard();
+        sendResponse({status: 'dashboard_refreshed'});
+        return true;
+    }
 });
 
 // ===============================
@@ -178,8 +185,19 @@ async function makeApiCall(shopId, roId) {
                         console.log("Background.js - Stored customer and repair order details.");
                     });
 
-                    // Start timeout check if customerTimeOut is available
+                    // Store in Promise Time tracking array
                     if (customerTimeOut) {
+                        addToPromiseTimeTracking({
+                            roId: roId,
+                            shopId: shopId,
+                            customerFullName: customerFullName || "N/A",
+                            repairOrderNumber: repairOrderNumber || "N/A",
+                            serviceWriterName: serviceWriterName || "N/A",
+                            vehicleDescription: vehicleDescription || "N/A",
+                            customerTimeOut: customerTimeOut,
+                            addedAt: Date.now()
+                        });
+                        
                         startTimeoutCheck(customerTimeOut);
                     } else {
                         console.warn("Background.js - No customerTimeOut found in response data.");
@@ -270,3 +288,86 @@ chrome.webNavigation.onHistoryStateUpdated.addListener((details) => {
         });
     }
 });
+
+// ===============================
+// PROMISE TIME TRACKING SYSTEM
+// ===============================
+
+// Add RO to Promise Time tracking
+function addToPromiseTimeTracking(roData) {
+    chrome.storage.local.get(['promiseTimeTracking'], (result) => {
+        let tracking = result.promiseTimeTracking || [];
+        
+        // Remove existing entry for this RO if it exists
+        tracking = tracking.filter(item => item.roId !== roData.roId);
+        
+        // Add new entry
+        tracking.push(roData);
+        
+        // Store updated tracking
+        chrome.storage.local.set({ promiseTimeTracking: tracking }, () => {
+            console.log("Background.js - Added RO to Promise Time tracking:", roData.repairOrderNumber);
+            updatePromiseTimeDashboard();
+        });
+    });
+}
+
+// Remove RO from Promise Time tracking (when timeout expires or is cancelled)
+function removeFromPromiseTimeTracking(roId) {
+    chrome.storage.local.get(['promiseTimeTracking'], (result) => {
+        let tracking = result.promiseTimeTracking || [];
+        tracking = tracking.filter(item => item.roId !== roId);
+        
+        chrome.storage.local.set({ promiseTimeTracking: tracking }, () => {
+            console.log("Background.js - Removed RO from Promise Time tracking:", roId);
+            updatePromiseTimeDashboard();
+        });
+    });
+}
+
+// Update Promise Time Dashboard data
+function updatePromiseTimeDashboard() {
+    chrome.storage.local.get(['promiseTimeTracking'], (result) => {
+        const tracking = result.promiseTimeTracking || [];
+        const currentTime = Date.now();
+        
+        // Filter out expired timeouts and calculate remaining time
+        const activePromises = tracking
+            .map(item => {
+                const timeoutDate = new Date(item.customerTimeOut).getTime();
+                const timeRemaining = timeoutDate - currentTime;
+                
+                return {
+                    ...item,
+                    timeRemaining: timeRemaining,
+                    isExpired: timeRemaining <= 0,
+                    urgencyLevel: getUrgencyLevel(timeRemaining)
+                };
+            })
+            .filter(item => !item.isExpired) // Remove expired ones
+            .sort((a, b) => a.timeRemaining - b.timeRemaining); // Sort by urgency (least time first)
+        
+        // Update storage with cleaned data
+        const cleanedTracking = activePromises.map(item => {
+            const { timeRemaining, isExpired, urgencyLevel, ...cleanItem } = item;
+            return cleanItem;
+        });
+        
+        chrome.storage.local.set({ 
+            promiseTimeTracking: cleanedTracking,
+            promiseTimeDashboardData: activePromises 
+        });
+    });
+}
+
+// Get urgency level based on time remaining
+function getUrgencyLevel(timeRemaining) {
+    const minutes = timeRemaining / (1000 * 60);
+    
+    if (minutes <= 30) return 'urgent';
+    if (minutes <= 60) return 'warning';
+    return 'safe';
+}
+
+// Periodic dashboard update
+setInterval(updatePromiseTimeDashboard, 60000); // Update every minute

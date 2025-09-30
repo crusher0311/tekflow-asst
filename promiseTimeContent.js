@@ -18,39 +18,96 @@
     function checkAndHighlightPromisedTimeout() {
         console.log("PromiseTimeContent.js - Executing checkAndHighlightPromisedTimeout function.");
 
-        const timeoutLabel = Array.from(document.querySelectorAll("label")).find(label =>
-            label.textContent.includes("Promised Time Out")
+        // Multiple selectors to find the Promised Time Out field
+        const selectors = [
+            // Look for label with "Promised Time Out" text
+            'label:contains("Promised Time Out")',
+            // Look for elements with specific text content
+            '*[title*="Promised Time Out"]',
+            // Look for the specific area shown in screenshot
+            '*:contains("Add time out")'
+        ];
+
+        let timeoutLabel = null;
+        let timeoutField = null;
+
+        // Try to find the label first
+        timeoutLabel = Array.from(document.querySelectorAll("*")).find(el => 
+            el.textContent && el.textContent.includes("Promised Time Out") && 
+            (el.tagName === 'LABEL' || el.classList.contains('label') || el.getAttribute('role') === 'label')
         );
 
         if (timeoutLabel) {
             console.log("PromiseTimeContent.js - Found 'Promised Time Out' label:", timeoutLabel);
 
-            const timeoutField = timeoutLabel.nextElementSibling ||
-                timeoutLabel.parentElement.querySelector("div.text-shade-200.text-base.cursor-pointer.hover\\:text-shade-0");
+            // Look for the associated field in multiple ways
+            timeoutField = timeoutLabel.nextElementSibling ||
+                         timeoutLabel.parentElement.querySelector("*:contains('Add time out')") ||
+                         timeoutLabel.parentElement.nextElementSibling ||
+                         document.querySelector("*:contains('Add time out')");
 
+        } else {
+            // If no label found, look directly for "Add time out" text
+            timeoutField = Array.from(document.querySelectorAll("*")).find(el => 
+                el.textContent && el.textContent.trim() === "Add time out..."
+            );
+            
             if (timeoutField) {
-                const contentText = timeoutField.textContent.trim();
-                console.log("PromiseTimeContent.js - Timeout field text content:", contentText);
+                // Try to find the associated label
+                timeoutLabel = timeoutField.previousElementSibling ||
+                              timeoutField.parentElement.querySelector("*:contains('Promised Time Out')") ||
+                              Array.from(document.querySelectorAll("*")).find(el => 
+                                  el.textContent && el.textContent.includes("Promised Time Out")
+                              );
+            }
+        }
 
-                // Apply white text and light red background if the field is empty
-                if (contentText.includes("Add time out")) {
-                    console.log("PromiseTimeContent.js - Field is empty. Applying white text and light red background.");
+        if (timeoutField) {
+            const contentText = timeoutField.textContent.trim();
+            console.log("PromiseTimeContent.js - Timeout field text content:", contentText);
 
-                    timeoutLabel.style.cssText = "color: white !important; background-color: #f28b82 !important; padding: 2px 4px; border-radius: 4px;";
-                    timeoutField.style.cssText = "color: white !important; background-color: #f28b82 !important; padding: 2px 4px; border-radius: 4px;";
+            // Apply highlighting if the field is empty or shows "Add time out"
+            if (contentText.includes("Add time out") || contentText === "" || contentText === "—") {
+                console.log("PromiseTimeContent.js - Field is empty. Applying highlighting.");
 
-                    stopCheckInterval();
-                } else {
-                    console.log("PromiseTimeContent.js - Promised Time Out is set. Removing custom styles.");
-                    timeoutLabel.style.cssText = "";
-                    timeoutField.style.cssText = "";
-                    stopCheckInterval();
+                // Enhanced highlighting styles
+                const highlightStyle = "color: white !important; background-color: #ff6b6b !important; padding: 4px 8px !important; border-radius: 6px !important; font-weight: bold !important; box-shadow: 0 2px 4px rgba(255, 107, 107, 0.3) !important; animation: pulse 2s infinite !important;";
+                
+                if (timeoutLabel) {
+                    timeoutLabel.style.cssText = highlightStyle;
                 }
+                timeoutField.style.cssText = highlightStyle;
+
+                // Add pulsing animation if not already added
+                if (!document.getElementById('promise-time-pulse-animation')) {
+                    const style = document.createElement('style');
+                    style.id = 'promise-time-pulse-animation';
+                    style.textContent = `
+                        @keyframes pulse {
+                            0% { opacity: 1; }
+                            50% { opacity: 0.7; }
+                            100% { opacity: 1; }
+                        }
+                    `;
+                    document.head.appendChild(style);
+                }
+
+                // Continue checking for changes
+                setTimeout(checkAndHighlightPromisedTimeout, 5000);
             } else {
-                console.warn("PromiseTimeContent.js - No timeout field found adjacent to the label.");
+                console.log("PromiseTimeContent.js - Promised Time Out is set. Removing custom styles.");
+                if (timeoutLabel) {
+                    timeoutLabel.style.cssText = "";
+                }
+                timeoutField.style.cssText = "";
+                stopCheckInterval();
             }
         } else {
-            console.warn("PromiseTimeContent.js - No 'Promised Time Out' label found on the page.");
+            console.warn("PromiseTimeContent.js - No 'Promised Time Out' field found on the page.");
+            // Keep trying if we're on a repair order page
+            if (window.location.href.includes('/repair-orders/')) {
+                setTimeout(checkAndHighlightPromisedTimeout, 3000);
+            }
         }
     }
 
