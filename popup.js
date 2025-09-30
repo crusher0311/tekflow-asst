@@ -63,14 +63,13 @@ function createPromiseTimeDashboardContent() {
     
     dashboardDiv.innerHTML = `
         <div id="dashboard-header">
-                        <div style="display: flex; align-items: center; justify-content: flex-start; margin-bottom: 15px;">
-                <button id="backToConcernBtn" style="background-color: var(--accent-blue); color: white; border: none; padding: 2px; border-radius: var(--radius); cursor: pointer; transition: background-color 0.2s; font-size: 12px; line-height: 1; margin-right: 10px; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;">←</button>
-                <h2 style="color: var(--text-primary); margin: 0; font-size: 16px; white-space: nowrap;">Promise Time Dashboard</h2>
-            </div>
-            <div style="display: flex; gap: 8px; margin-bottom: 20px;">
-                <button id="refreshDashboardBtn" style="background-color: var(--accent-green); color: white; border: none; padding: 8px 16px; border-radius: var(--radius); cursor: pointer; transition: background-color 0.2s;">🔄 Refresh</button>
-                <button id="scanCurrentPageBtn" style="background-color: var(--accent-blue); color: white; border: none; padding: 8px 16px; border-radius: var(--radius); cursor: pointer; transition: background-color 0.2s;">🔍 Scan Current Page</button>
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px;">
+                <button id="backToConcernBtn" style="background-color: var(--bg-tertiary); color: var(--text-muted); border: 1px solid var(--border-color); padding: 4px 8px; border-radius: var(--radius); cursor: pointer; transition: all 0.2s; font-size: 11px;" title="Back to concerns">←</button>
+                <h2 style="color: var(--text-primary); margin: 0; font-size: 20px; white-space: nowrap; flex-grow: 1; text-align: center;">Promise Time Dashboard</h2>
                 <button id="testNotificationsBtn" style="background-color: var(--bg-tertiary); color: var(--text-muted); border: 1px solid var(--border-color); padding: 4px 8px; border-radius: var(--radius); cursor: pointer; transition: all 0.2s; font-size: 11px;" title="Test notifications">🔔</button>
+            </div>
+            <div style="display: flex; justify-content: center; margin-bottom: 20px;">
+                <button id="refreshDashboardBtn" style="background-color: var(--accent-blue); color: white; border: none; padding: 8px 16px; border-radius: var(--radius); cursor: pointer; transition: background-color 0.2s;">🔄 Refresh</button>
             </div>
             <div id="dashboardCount" style="color: var(--text-muted); margin-bottom: 15px; font-size: 14px;">Loading...</div>
         </div>
@@ -86,16 +85,19 @@ function createPromiseTimeDashboardContent() {
     setTimeout(() => {
         const backBtn = dashboardDiv.querySelector('#backToConcernBtn');
         const refreshBtn = dashboardDiv.querySelector('#refreshDashboardBtn');
-        const scanBtn = dashboardDiv.querySelector('#scanCurrentPageBtn');
         const testBtn = dashboardDiv.querySelector('#testNotificationsBtn');
         
         // Add hover effects
-        backBtn?.addEventListener('mouseenter', (e) => e.target.style.backgroundColor = 'var(--accent-blue-hover)');
-        backBtn?.addEventListener('mouseleave', (e) => e.target.style.backgroundColor = 'var(--accent-blue)');
-        refreshBtn?.addEventListener('mouseenter', (e) => e.target.style.backgroundColor = 'var(--accent-green-hover)');
-        refreshBtn?.addEventListener('mouseleave', (e) => e.target.style.backgroundColor = 'var(--accent-green)');
-        scanBtn?.addEventListener('mouseenter', (e) => e.target.style.backgroundColor = 'var(--accent-blue-hover)');
-        scanBtn?.addEventListener('mouseleave', (e) => e.target.style.backgroundColor = 'var(--accent-blue)');
+        backBtn?.addEventListener('mouseenter', (e) => {
+            e.target.style.backgroundColor = 'var(--border-color)';
+            e.target.style.color = 'var(--text-primary)';
+        });
+        backBtn?.addEventListener('mouseleave', (e) => {
+            e.target.style.backgroundColor = 'var(--bg-tertiary)';
+            e.target.style.color = 'var(--text-muted)';
+        });
+        refreshBtn?.addEventListener('mouseenter', (e) => e.target.style.backgroundColor = 'var(--accent-blue-hover)');
+        refreshBtn?.addEventListener('mouseleave', (e) => e.target.style.backgroundColor = 'var(--accent-blue)');
         testBtn?.addEventListener('mouseenter', (e) => {
             e.target.style.backgroundColor = 'var(--border-color)';
             e.target.style.color = 'var(--text-primary)';
@@ -110,7 +112,6 @@ function createPromiseTimeDashboardContent() {
             chrome.runtime.sendMessage({ action: 'refreshPromiseDashboard' });
             loadDashboardData();
         });
-        scanBtn?.addEventListener('click', scanCurrentPageForPromiseTime);
         testBtn?.addEventListener('click', () => {
             // Clear notification tracking and test notifications
             chrome.runtime.sendMessage({ action: 'clearNotificationTracking' }, (response) => {
