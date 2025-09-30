@@ -210,30 +210,62 @@ function createDashboardPromiseTimeItem(data) {
 function scanCurrentPageForPromiseTime() {
     // Get current active tab and scan for promise time data
     chrome.tabs.query({active: true, currentWindow: true}, (tabs) => {
+        console.log('scanCurrentPageForPromiseTime - tabs found:', tabs);
+        
         if (tabs.length > 0) {
             const currentTab = tabs[0];
+            console.log('scanCurrentPageForPromiseTime - current tab:', currentTab);
             
-            // Check if currentTab and currentTab.url exist
-            if (!currentTab || !currentTab.url) {
-                console.log('No current tab or URL available');
-                alert('Unable to access current tab. Please make sure you are on a Tekmetric page.');
+            // Check if currentTab exists
+            if (!currentTab) {
+                console.log('No current tab available');
+                alert('Unable to access current tab. Please try again.');
                 return;
             }
             
-            // Check if we're on a Tekmetric repair order page
-            const roPattern = /https:\/\/shop\.tekmetric\.com\/admin\/shop\/(\d+)\/repair-orders\/(\d+)/;
-            const match = currentTab.url.match(roPattern);
+            // Check URL with more flexible matching
+            const url = currentTab.url || '';
+            console.log('scanCurrentPageForPromiseTime - URL:', url);
             
-            if (match) {
-                const shopId = match[1];
-                const roId = match[2];
-                
-                console.log('Scanning for promise time on:', currentTab.url);
+            // More flexible URL patterns for Tekmetric
+            const tekmetricPatterns = [
+                /https:\/\/shop\.tekmetric\.com\/admin\/shop\/(\d+)\/repair-orders\/(\d+)/,
+                /https:\/\/shop\.tekmetric\.com\/.*\/repair-orders\/(\d+)/,
+                /tekmetric\.com.*repair-orders.*(\d+)/
+            ];
+            
+            let match = null;
+            let shopId = null;
+            let roId = null;
+            
+            // Try each pattern to find a match
+            for (const pattern of tekmetricPatterns) {
+                match = url.match(pattern);
+                if (match) {
+                    console.log('URL matched pattern:', pattern, 'match:', match);
+                    if (match.length >= 3) {
+                        shopId = match[1];
+                        roId = match[2];
+                    } else if (match.length >= 2) {
+                        roId = match[1];
+                        // Try to extract shop ID from URL differently
+                        const shopMatch = url.match(/shop\/(\d+)/);
+                        shopId = shopMatch ? shopMatch[1] : '12345'; // fallback shop ID
+                    }
+                    break;
+                }
+            }
+            
+            // Also check if we're on any Tekmetric page
+            const isTekmetricPage = url.includes('tekmetric.com') || url.includes('shop.tekmetric.com');
+            
+            if (match && roId) {
+                console.log('Scanning for promise time on:', url, 'shopId:', shopId, 'roId:', roId);
                 
                 // Send message to content script to extract promise time data
                 chrome.tabs.sendMessage(currentTab.id, { 
                     action: 'extractPromiseTimeData',
-                    shopId: shopId,
+                    shopId: shopId || 'unknown',
                     roId: roId
                 }, (response) => {
                     if (chrome.runtime.lastError) {
@@ -245,14 +277,14 @@ function scanCurrentPageForPromiseTime() {
                         }, () => {
                             if (chrome.runtime.lastError) {
                                 console.error('Failed to inject content script:', chrome.runtime.lastError);
-                                alert('Failed to scan page. Please try again.');
+                                alert('Failed to scan page. Please refresh the page and try again.');
                                 return;
                             }
                             // Try again after injection
                             setTimeout(() => {
                                 chrome.tabs.sendMessage(currentTab.id, { 
                                     action: 'extractPromiseTimeData',
-                                    shopId: shopId,
+                                    shopId: shopId || 'unknown',
                                     roId: roId
                                 }, (retryResponse) => {
                                     console.log('Retry scan response:', retryResponse);
@@ -260,8 +292,10 @@ function scanCurrentPageForPromiseTime() {
                                         // Force refresh the dashboard
                                         chrome.runtime.sendMessage({ action: 'refreshPromiseDashboard' });
                                         setTimeout(loadDashboardData, 500);
+                                        alert('Promise time data found and added to dashboard!');
                                     } else {
                                         console.log('Scan completed but no promise time found');
+                                        alert('No promise time found on this page. The page may not have a promise time set.');
                                     }
                                 });
                             }, 1000);
@@ -272,16 +306,20 @@ function scanCurrentPageForPromiseTime() {
                             // Force refresh the dashboard
                             chrome.runtime.sendMessage({ action: 'refreshPromiseDashboard' });
                             setTimeout(loadDashboardData, 500);
+                            alert('Promise time data found and added to dashboard!');
                         } else {
                             console.log('Scan completed but no promise time found');
+                            alert('No promise time found on this page. The page may not have a promise time set.');
                         }
                     }
                 });
+            } else if (isTekmetricPage) {
+                alert('This appears to be a Tekmetric page, but not a repair order page. Please navigate to a specific repair order to scan for promise times.');
             } else {
-                alert('Please navigate to a Tekmetric repair order page to scan for promise times.');
+                alert('Please navigate to a Tekmetric repair order page to scan for promise times.\n\nCurrent URL: ' + url);
             }
         } else {
-            alert('No active tab found. Please make sure you are on a Tekmetric page.');
+            alert('No active tab found. Please make sure you have a Tekmetric page open.');
         }
     });
 }

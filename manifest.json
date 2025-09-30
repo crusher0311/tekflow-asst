@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "TekFlow Assistant",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "description": "Side Panel Production",
   "permissions": [
     "sidePanel",
@@ -34,7 +34,8 @@
   "host_permissions": [
     "*://api.openai.com/*",
     "*://firebase.googleapis.com/*",
-    "*://firestore.googleapis.com/*"
+    "*://firestore.googleapis.com/*",
+    "*://shop.tekmetric.com/*"
   ],
   "side_panel": {
     "default_path": "sidepanel.html"
