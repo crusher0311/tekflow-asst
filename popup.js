@@ -66,13 +66,15 @@ function createPromiseTimeDashboardContent() {
     
     dashboardDiv.innerHTML = `
         <div id="dashboard-header">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                <h2 style="color: var(--text-primary); margin: 0;">Promise Time Dashboard</h2>
-                <button id="backToConcernBtn" style="background-color: var(--accent-blue); color: white; border: none; padding: 8px 16px; border-radius: var(--radius); cursor: pointer; transition: background-color 0.2s;">← Back</button>
-            </div>
-            <div style="display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap;">
-                <button id="refreshDashboardBtn" style="background-color: var(--accent-green); color: white; border: none; padding: 8px 16px; border-radius: var(--radius); cursor: pointer; transition: background-color 0.2s;">🔄 Refresh</button>
-                <button id="scanCurrentPageBtn" style="background-color: var(--accent-blue); color: white; border: none; padding: 8px 16px; border-radius: var(--radius); cursor: pointer; transition: background-color 0.2s;">🔍 Scan Current Page</button>
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <button id="backToConcernBtn" style="background-color: var(--accent-blue); color: white; border: none; padding: 6px; border-radius: var(--radius); cursor: pointer; transition: background-color 0.2s; font-size: 14px; line-height: 1;">←</button>
+                    <h2 style="color: var(--text-primary); margin: 0; font-size: 18px;">Promise Time Dashboard</h2>
+                </div>
+                <div style="display: flex; gap: 8px;">
+                    <button id="refreshDashboardBtn" style="background-color: var(--accent-green); color: white; border: none; padding: 8px 16px; border-radius: var(--radius); cursor: pointer; transition: background-color 0.2s;">🔄 Refresh</button>
+                    <button id="scanCurrentPageBtn" style="background-color: var(--accent-blue); color: white; border: none; padding: 8px 16px; border-radius: var(--radius); cursor: pointer; transition: background-color 0.2s;">🔍 Scan Current Page</button>
+                </div>
             </div>
             <div id="dashboardCount" style="color: var(--text-muted); margin-bottom: 15px; font-size: 14px;">Loading...</div>
         </div>
@@ -336,7 +338,8 @@ function initializePromiseTimeMonitor() {
         'vehicleDescription',
         'repairOrderNumber',
         'tekmetric_token',
-        'roId'
+        'roId',
+        'roUrl'
     ], (result) => {
         if (result.customerTimeOut) {
             updatePromiseTimeDisplay(result);
@@ -354,7 +357,8 @@ function initializePromiseTimeMonitor() {
                 'vehicleDescription',
                 'repairOrderNumber',
                 'tekmetric_token',
-                'roId'
+                'roId',
+                'roUrl'
             ], (result) => {
                 updatePromiseTimeDisplay(result);
             });
@@ -396,7 +400,14 @@ function updatePromiseTimeDisplay(data) {
 
         // Setup repair order link
         const shopId = data.tekmetric_token ? data.tekmetric_token.shopId : null;
-        if (shopId && data.roId) {
+        if (data.roUrl) {
+            // Use stored URL for direct navigation
+            openROButton.style.display = 'inline-block';
+            openROButton.onclick = () => {
+                chrome.tabs.create({ url: data.roUrl });
+            };
+        } else if (shopId && data.roId) {
+            // Fallback to constructed URL
             openROButton.style.display = 'inline-block';
             openROButton.onclick = () => {
                 chrome.tabs.create({

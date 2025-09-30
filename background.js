@@ -332,6 +332,7 @@ function storePromiseTimeData(data) {
         serviceWriterName: data.serviceWriterName,
         shopId: data.shopId,
         roId: data.roId,
+        roUrl: data.roUrl, // Add URL for click functionality
         lastUpdated: new Date().toISOString()
     };
     
@@ -344,7 +345,8 @@ function storePromiseTimeData(data) {
         customerFullName: data.customerFullName,
         vehicleDescription: data.vehicleDescription,
         repairOrderNumber: data.repairOrderNumber,
-        roId: data.roId
+        roId: data.roId,
+        roUrl: data.roUrl // Store URL for quick access
     });
 }
 

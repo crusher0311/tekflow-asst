@@ -138,12 +138,175 @@
             sendResponse({status: 'promise_check_started'});
         } else if (message.action === 'extractPromiseTimeData') {
             console.log("PromiseTimeContent.js - Message received to extract promise time data from current page.");
-            extractPromiseTimeDataFromPage(message.shopId, message.roId, sendResponse);
+            
+            // Check if this is a Job Board page and handle multiple promise times
+            if (isJobBoardPage()) {
+                extractJobBoardPromiseTimes(message.shopId, sendResponse);
+            } else {
+                extractPromiseTimeDataFromPage(message.shopId, message.roId, sendResponse);
+            }
             return true; // Keep the message channel open for async response
         }
     });
 
-    // Section 5: Extract Promise Time Data from Current Page
+    // Section 5: Job Board Promise Time Scanning
+    function isJobBoardPage() {
+        // Check URL and page content to determine if this is a Job Board page
+        const url = window.location.href;
+        const isJobBoardUrl = url.includes('/admin/shop/') && (url.includes('?view=column') || url.includes('board=ACTIVE'));
+        const hasJobBoardTitle = document.querySelector('h1')?.textContent?.includes('Job Board');
+        
+        console.log('PromiseTimeContent.js - Job Board check:', { isJobBoardUrl, hasJobBoardTitle, url });
+        return isJobBoardUrl || hasJobBoardTitle;
+    }
+
+    function extractJobBoardPromiseTimes(shopId, sendResponse) {
+        try {
+            console.log('PromiseTimeContent.js - Scanning Job Board for promise times');
+            const promiseTimes = [];
+            
+            // Look for date elements that match promise time patterns
+            const dateElements = document.querySelectorAll('*');
+            
+            for (const element of dateElements) {
+                if (!element || !element.textContent) continue;
+                
+                const text = element.textContent.trim();
+                
+                // Look for the full date format "September 30, 2025 at 08:00 AM"
+                const fullDateMatch = text.match(/(\w+)\s+(\d{1,2}),?\s+(\d{4})\s+at\s+(\d{1,2}):(\d{2})\s*([AP]M)/i);
+                if (fullDateMatch) {
+                    const promiseTime = parseDateTime(text);
+                    if (promiseTime && promiseTime > new Date()) {
+                        // Find associated customer and vehicle info
+                        const roCard = element.closest('[class*="card"], [class*="item"], .job-item, .ro-item') || 
+                                     element.closest('div[style*="background"], div[style*="border"]');
+                        
+                        if (roCard) {
+                            const customerInfo = extractCustomerFromJobCard(roCard);
+                            const vehicleInfo = extractVehicleFromJobCard(roCard);
+                            const roNumber = extractRONumberFromJobCard(roCard);
+                            
+                            promiseTimes.push({
+                                customerTimeOut: promiseTime.toISOString(),
+                                customerFullName: customerInfo,
+                                vehicleDescription: vehicleInfo,
+                                repairOrderNumber: roNumber,
+                                serviceWriterName: '',
+                                shopId: shopId,
+                                roId: roNumber,
+                                roUrl: window.location.href
+                            });
+                            
+                            console.log('PromiseTimeContent.js - Found Job Board promise time:', {
+                                customer: customerInfo,
+                                vehicle: vehicleInfo,
+                                ro: roNumber,
+                                time: promiseTime
+                            });
+                        }
+                    }
+                }
+            }
+            
+            if (promiseTimes.length > 0) {
+                // Send all promise times to background for storage
+                for (const promiseTimeData of promiseTimes) {
+                    chrome.runtime.sendMessage({
+                        action: 'storePromiseTimeData',
+                        data: promiseTimeData
+                    });
+                }
+                
+                sendResponse({ 
+                    success: true, 
+                    message: `Found ${promiseTimes.length} promise time(s) on Job Board`,
+                    count: promiseTimes.length
+                });
+            } else {
+                sendResponse({ success: false, message: 'No promise times found on Job Board' });
+            }
+        } catch (error) {
+            console.error('PromiseTimeContent.js - Error scanning Job Board:', error);
+            sendResponse({ success: false, message: 'Error scanning Job Board: ' + error.message });
+        }
+    }
+
+    function extractCustomerFromJobCard(cardElement) {
+        try {
+            // Look for customer name patterns in the card
+            const customerSelectors = [
+                'h3, h4, h5',
+                '[class*="customer"]',
+                '[class*="name"]',
+                'strong',
+                'b'
+            ];
+            
+            for (const selector of customerSelectors) {
+                const elements = cardElement.querySelectorAll(selector);
+                for (const el of elements) {
+                    const text = el.textContent?.trim();
+                    if (text && text.length > 2 && text.length < 50 && 
+                        !text.includes('RO') && !text.includes('$') && 
+                        !text.includes(':') && !text.match(/\d{4}/)) {
+                        return text;
+                    }
+                }
+            }
+            return 'Unknown Customer';
+        } catch (error) {
+            console.log('PromiseTimeContent.js - Error extracting customer from card:', error);
+            return 'Unknown Customer';
+        }
+    }
+
+    function extractVehicleFromJobCard(cardElement) {
+        try {
+            // Look for vehicle info patterns (year + make/model)
+            const textContent = cardElement.textContent || '';
+            
+            // Match year + vehicle info pattern
+            const vehicleMatch = textContent.match(/\b(19|20)\d{2}\s+[A-Za-z]+[^$\n]*(?=\s|$)/);
+            if (vehicleMatch) {
+                const vehicleText = vehicleMatch[0].trim();
+                if (vehicleText.length > 8 && vehicleText.length < 100) {
+                    return vehicleText;
+                }
+            }
+            
+            return 'Unknown Vehicle';
+        } catch (error) {
+            console.log('PromiseTimeContent.js - Error extracting vehicle from card:', error);
+            return 'Unknown Vehicle';
+        }
+    }
+
+    function extractRONumberFromJobCard(cardElement) {
+        try {
+            // Look for RO number patterns
+            const textContent = cardElement.textContent || '';
+            
+            // Look for RO# patterns
+            const roMatch = textContent.match(/RO\s*#?(\w+)/i);
+            if (roMatch) {
+                return roMatch[1];
+            }
+            
+            // Look for ID or number patterns
+            const idMatch = textContent.match(/\b(\d{3,6})\b/);
+            if (idMatch) {
+                return idMatch[1];
+            }
+            
+            return 'Unknown';
+        } catch (error) {
+            console.log('PromiseTimeContent.js - Error extracting RO number from card:', error);
+            return 'Unknown';
+        }
+    }
+
+    // Section 6: Extract Promise Time Data from Current Page
     function extractPromiseTimeDataFromPage(shopId, roId, sendResponse) {
         try {
             console.log('PromiseTimeContent.js - Starting extraction for shopId:', shopId, 'roId:', roId);
@@ -161,15 +324,29 @@
                 serviceWriter
             });
             
-            // Extract RO number from URL if not provided
+            // Extract RO number from page title (e.g., "RO #001: Jay Demore's 2021 Chevrolet...")
             let repairOrderNumber = roId;
             try {
-                const urlMatch = window.location.href.match(/repair-orders\/(\d+)/);
-                if (urlMatch) {
-                    repairOrderNumber = urlMatch[1];
+                // First try to get from page title
+                const titleElement = document.querySelector('h1, [data-testid="repair-order-title"], .page-title');
+                if (titleElement) {
+                    const titleText = titleElement.textContent || titleElement.innerText || '';
+                    const roMatch = titleText.match(/RO\s*#?(\w+):/);
+                    if (roMatch) {
+                        repairOrderNumber = roMatch[1];
+                        console.log('PromiseTimeContent.js - Extracted RO from title:', repairOrderNumber);
+                    }
+                }
+                
+                // Fallback to URL if title parsing fails
+                if (!repairOrderNumber || repairOrderNumber === roId) {
+                    const urlMatch = window.location.href.match(/repair-orders\/(\d+)/);
+                    if (urlMatch) {
+                        repairOrderNumber = urlMatch[1];
+                    }
                 }
             } catch (urlError) {
-                console.log('PromiseTimeContent.js - Error parsing URL:', urlError);
+                console.log('PromiseTimeContent.js - Error parsing RO number:', urlError);
             }
 
             if (promiseTimeData && promiseTimeData.timeOut) {
@@ -183,7 +360,8 @@
                         repairOrderNumber: repairOrderNumber,
                         serviceWriterName: serviceWriter,
                         shopId: shopId,
-                        roId: roId
+                        roId: roId,
+                        roUrl: window.location.href // Add current URL for click functionality
                     }
                 });
 
@@ -200,7 +378,22 @@
 
     function extractCustomerName() {
         try {
-            // Look for customer name in various possible locations
+            // First try to extract from page title (e.g., "RO #001: Jay Demore's 2021 Chevrolet...")
+            const titleElement = document.querySelector('h1, [data-testid="repair-order-title"], .page-title');
+            if (titleElement) {
+                const titleText = titleElement.textContent || titleElement.innerText || '';
+                console.log('PromiseTimeContent.js - Page title for customer extraction:', titleText);
+                
+                // Match pattern: "RO #001: Jay Demore's 2021..."
+                const customerMatch = titleText.match(/RO\s*#?\w+:\s*([^']+)'s?\s+\d{4}/);
+                if (customerMatch) {
+                    const customerName = customerMatch[1].trim();
+                    console.log('PromiseTimeContent.js - Extracted customer name:', customerName);
+                    return customerName;
+                }
+            }
+            
+            // Fallback to looking for customer name in various locations
             const selectors = [
                 '*[data-testid*="customer"]',
                 '.customer-name',
@@ -231,7 +424,22 @@
 
     function extractVehicleDescription() {
         try {
-            // Look for vehicle information
+            // First try to extract from page title (e.g., "RO #001: Jay Demore's 2021 Chevrolet Silverado 1500 RST")
+            const titleElement = document.querySelector('h1, [data-testid="repair-order-title"], .page-title');
+            if (titleElement) {
+                const titleText = titleElement.textContent || titleElement.innerText || '';
+                console.log('PromiseTimeContent.js - Page title for vehicle extraction:', titleText);
+                
+                // Match pattern: "RO #001: Jay Demore's 2021 Chevrolet Silverado 1500 RST"
+                const vehicleMatch = titleText.match(/RO\s*#?\w+:\s*[^']+['s]*\s+(\d{4}\s+.+?)(?:\s+Work Not Started|$)/);
+                if (vehicleMatch) {
+                    const vehicleDescription = vehicleMatch[1].trim();
+                    console.log('PromiseTimeContent.js - Extracted vehicle description:', vehicleDescription);
+                    return vehicleDescription;
+                }
+            }
+            
+            // Fallback: Look for vehicle information
             const selectors = [
                 '*[data-testid*="vehicle"]',
                 '.vehicle-info',
@@ -461,6 +669,33 @@
             // Try different parsing approaches
             const parseAttempts = [
                 () => {
+                    // Handle full date format "September 30, 2025 at 08:00 AM" (Job Board format)
+                    const fullDateMatch = dateStr.match(/(\w+)\s+(\d{1,2}),?\s+(\d{4})\s+at\s+(\d{1,2}):(\d{2})\s*([AP]M)?/i);
+                    if (fullDateMatch) {
+                        const [, monthName, day, year, hour, minute, ampm] = fullDateMatch;
+                        
+                        // Map full month names
+                        const monthMap = {
+                            'january': 0, 'february': 1, 'march': 2, 'april': 3, 'may': 4, 'june': 5,
+                            'july': 6, 'august': 7, 'september': 8, 'october': 9, 'november': 10, 'december': 11
+                        };
+                        
+                        const monthNum = monthMap[monthName.toLowerCase()];
+                        if (monthNum !== undefined) {
+                            let hour24 = parseInt(hour);
+                            if (ampm) {
+                                if (ampm.toLowerCase() === 'pm' && hour24 !== 12) hour24 += 12;
+                                if (ampm.toLowerCase() === 'am' && hour24 === 12) hour24 = 0;
+                            }
+                            
+                            const result = new Date(parseInt(year), monthNum, parseInt(day), hour24, parseInt(minute));
+                            console.log('PromiseTimeContent.js - Parsed full date format:', result);
+                            return result;
+                        }
+                    }
+                    return null;
+                },
+                () => {
                     // Handle "Tue, Sep 30 08:00 AM" format specifically
                     const shortFormatMatch = dateStr.match(/(\w{3}),?\s+(\w{3})\s+(\d{1,2})\s+(\d{1,2}):(\d{2})\s*([AP]M)?/i);
                     if (shortFormatMatch) {
@@ -480,19 +715,35 @@
                                 if (ampm.toLowerCase() === 'am' && hour24 === 12) hour24 = 0;
                             }
                             
-                            // Use current year and month logic to determine the correct year
+                            // Smart year detection logic
                             const now = new Date();
                             let year = now.getFullYear();
                             
-                            // If the month/day has passed this year, assume next year
-                            const testDate = new Date(year, monthNum, parseInt(day), hour24, parseInt(minute));
+                            // Create initial date for this year
+                            let testDate = new Date(year, monthNum, parseInt(day), hour24, parseInt(minute));
+                            
+                            // If the date/time is in the past, check if it's within the next 7 days
                             if (testDate < now) {
-                                year += 1;
+                                // If it's less than 7 days ago, it probably means next occurrence (tomorrow, next week, etc.)
+                                const daysDiff = (now - testDate) / (24 * 60 * 60 * 1000);
+                                if (daysDiff <= 7) {
+                                    // Try next year only if it's been more than a few days
+                                    const futureDate = new Date(year + 1, monthNum, parseInt(day), hour24, parseInt(minute));
+                                    // If future date is more than 300 days away, use this year instead
+                                    const futureDaysDiff = (futureDate - now) / (24 * 60 * 60 * 1000);
+                                    if (futureDaysDiff > 300) {
+                                        testDate = testDate; // Keep this year's date
+                                    } else {
+                                        testDate = futureDate; // Use next year
+                                    }
+                                } else {
+                                    // If it's been weeks/months, definitely next year
+                                    testDate = new Date(year + 1, monthNum, parseInt(day), hour24, parseInt(minute));
+                                }
                             }
                             
-                            const result = new Date(year, monthNum, parseInt(day), hour24, parseInt(minute));
-                            console.log('PromiseTimeContent.js - Parsed short format:', result);
-                            return result;
+                            console.log('PromiseTimeContent.js - Parsed short format:', testDate);
+                            return testDate;
                         }
                     }
                     return null;
