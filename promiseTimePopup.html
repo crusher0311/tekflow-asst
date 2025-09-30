@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Promise Time Alert - TekFlow Assistant</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            padding: 20px;
+            width: 350px;
+            min-height: 250px;
+        }
+        h1 {
+            font-size: 18px;
+            color: var(--accent-red, #f28b82);
+            margin-bottom: 15px;
+        }
+        #timer {
+            font-size: 24px;
+            color: var(--accent-red, #f28b82);
+            font-weight: bold;
+            margin: 15px 0;
+        }
+        .customer-info {
+            text-align: left;
+            margin: 15px 0;
+            padding: 10px;
+            background-color: var(--surface-secondary, #f5f5f5);
+            border-radius: 8px;
+            font-size: 14px;
+        }
+        .customer-info p {
+            margin: 5px 0;
+        }
+        .snooze-container {
+            margin-top: 15px;
+            padding: 10px;
+            border-top: 1px solid var(--border-color, #ddd);
+        }
+        .snooze-container select, .snooze-container button {
+            margin: 5px;
+            padding: 5px 10px;
+        }
+        #repairOrder {
+            color: var(--accent-blue, #4285f4);
+            text-decoration: none;
+            font-weight: bold;
+        }
+        #repairOrder:hover {
+            text-decoration: underline;
+        }
+        .time-expired {
+            color: var(--accent-red, #ff4444) !important;
+            font-weight: bold;
+            animation: pulse 1s infinite;
+        }
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.7; }
+            100% { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <h1>🚨 Promise Time Alert</h1>
+    <div id="timer">Calculating...</div>
+
+    <div class="customer-info">
+        <p><strong>Service Writer:</strong> <span id="serviceWriter">Loading...</span></p>
+        <p><strong>Customer:</strong> <span id="customerName">Loading...</span></p>
+        <p><strong>Vehicle:</strong> <span id="vehicle">Loading...</span></p>
+        <p><a id="repairOrder" href="#" target="_blank">Open Repair Order</a></p>
+    </div>
+
+    <div class="snooze-container">
+        <label for="snooze-time">Snooze for:</label>
+        <select id="snooze-time">
+            <option value="5">5 minutes</option>
+            <option value="10">10 minutes</option>
+            <option value="15">15 minutes</option>
+            <option value="30">30 minutes</option>
+            <option value="custom">Custom...</option>
+        </select>
+        <button id="snooze-button">Snooze</button>
+    </div>
+
+    <script>
+        // Initialize theme
+        chrome.storage.sync.get(['theme'], function(result) {
+            const theme = result.theme || 'dark';
+            document.documentElement.setAttribute('data-theme', theme);
+        });
+    </script>
+    <script src="promiseTimePopup.js"></script>
+</body>
+</html>

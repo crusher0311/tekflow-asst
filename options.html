@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Customer Concern Assistant - Options</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="options-content">
+        <h1>Customer Concern Assistant - Options</h1>
+        
+        <!-- Saved Conversations Section -->
+        <div class="options-section" id="saved-conversations">
+            <h2>Saved Conversations</h2>
+            <div id="conversation-list"></div>
+            <button id="deleteAllBtn" class="delete-all-button">Delete All Conversations</button>
+        </div>
+
+        <!-- Export Conversations Section -->
+        <div class="options-section" id="export-options">
+            <h2>Export Conversations</h2>
+            <button id="exportBtn">Export All Conversations</button>
+        </div>
+
+        <!-- Theme Selection Section -->
+        <div class="options-section" id="theme-options">
+            <h2>Theme</h2>
+            <div class="radio-group">
+                <div class="radio-option">
+                    <input type="radio" id="light-theme" name="theme" value="light">
+                    <label for="light-theme">Light Theme</label>
+                </div>
+                <div class="radio-option">
+                    <input type="radio" id="dark-theme" name="theme" value="dark" checked>
+                    <label for="dark-theme">Dark Theme</label>
+                </div>
+            </div>
+            <button id="saveTheme">Save Theme</button>
+        </div>
+
+        <!-- Conversation Layout Section -->
+        <div class="options-section" id="layout-options">
+            <h2>Conversation Layout</h2>
+            <div class="radio-group">
+                <div class="radio-option">
+                    <input type="radio" id="paragraph-style" name="layout" value="paragraph" checked>
+                    <label for="paragraph-style">Paragraph Style</label>
+                </div>
+                <div class="radio-option">
+                    <input type="radio" id="qa-style" name="layout" value="qa">
+                    <label for="qa-style">Q&A Style</label>
+                </div>
+                <div class="radio-option">
+                    <input type="radio" id="sentence-style" name="layout" value="sentence">
+                    <label for="sentence-style">Sentence Style</label>
+                </div>
+            </div>
+            <button id="saveLayout">Save Layout</button>
+        </div>
+
+        <!-- API Logic Configuration Section -->
+        <div class="options-section" id="api-logic-section">
+            <h2>API Logic Configuration</h2>
+            <label for="openaiApiKey">OpenAI API Key:</label>
+            <input type="password" id="openaiApiKey" placeholder="Enter your OpenAI API key...">
+            <button id="saveApiKeyButton">Save API Key</button>
+            <br><br>
+            <label for="openaiPrompt">Default Prompt for OpenAI:</label>
+            <textarea id="openaiPrompt" placeholder="Enter the default prompt for OpenAI..."></textarea>
+            <button id="savePromptButton">Save Prompt</button>
+        </div>
+
+        <!-- Instructions Section -->
+        <div class="options-section" id="readme-section">
+            <h2>Instructions</h2>
+            <p>1. Enter the customer's concern in the input box and click "Submit Concern".</p>
+            <p>2. Follow-up questions will be listed in the Follow-Up List section. Click on a question to move it to the active area.</p>
+            <p>3. Enter the customer's response to each follow-up question and click "Submit".</p>
+            <p>4. Use the "Save" button to save the conversation when complete.</p>
+        </div>
+
+        <!-- OpenAI Proxy URL Section -->
+        <div class="options-section" id="proxy-section">
+            <h2>OpenAI Proxy URL (optional)</h2>
+            <p>If you deploy the recommended server-side proxy, set its base URL below (for example: https://my-proxy.example.com). If set, the extension will call your proxy instead of directly calling OpenAI.</p>
+            <input type="text" id="proxyUrl" placeholder="https://my-proxy.example.com">
+            <button id="saveProxyButton">Save Proxy URL</button>
+        </div>
+
+        <!-- Promise Time Alerts Section -->
+        <div class="options-section" id="promise-time-section">
+            <h2>Promise Time Alerts</h2>
+            <p>Configure when to receive alerts before customer promise times expire. Alerts will appear as popup windows.</p>
+            <label>Warning Intervals (minutes before timeout):</label>
+            <div id="intervalList"></div>
+            <div class="button-container">
+                <button id="addInterval">Add Interval</button>
+                <button id="saveIntervals">Save Intervals</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="options.js"></script>
+</body>
+</html>
