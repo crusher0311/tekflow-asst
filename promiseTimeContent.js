@@ -331,11 +331,17 @@
                 const titleElement = document.querySelector('h1, [data-testid="repair-order-title"], .page-title');
                 if (titleElement) {
                     const titleText = titleElement.textContent || titleElement.innerText || '';
+                    console.log('PromiseTimeContent.js - Page title for RO extraction:', titleText);
+                    
                     const roMatch = titleText.match(/RO\s*#?(\w+):/);
                     if (roMatch) {
                         repairOrderNumber = roMatch[1];
                         console.log('PromiseTimeContent.js - Extracted RO from title:', repairOrderNumber);
+                    } else {
+                        console.log('PromiseTimeContent.js - No RO match found in title:', titleText);
                     }
+                } else {
+                    console.log('PromiseTimeContent.js - No title element found');
                 }
                 
                 // Fallback to URL if title parsing fails
@@ -384,12 +390,26 @@
                 const titleText = titleElement.textContent || titleElement.innerText || '';
                 console.log('PromiseTimeContent.js - Page title for customer extraction:', titleText);
                 
-                // Match pattern: "RO #001: Jay Demore's 2021..."
-                const customerMatch = titleText.match(/RO\s*#?\w+:\s*([^']+)'s?\s+\d{4}/);
+                // Match pattern: "RO #001: Jay Demore's 2021..." 
+                // Test multiple patterns to be more robust
+                let customerMatch = titleText.match(/RO\s*#?\w+:\s*([^']+)'s?\s+\d{4}/);
+                if (!customerMatch) {
+                    // Try alternative pattern without 's
+                    customerMatch = titleText.match(/RO\s*#?\w+:\s*([^0-9]+?)\s+\d{4}/);
+                }
+                if (!customerMatch) {
+                    // Try even simpler pattern
+                    customerMatch = titleText.match(/:\s*([A-Za-z\s]+?)\s*\d{4}/);
+                }
+                
                 if (customerMatch) {
-                    const customerName = customerMatch[1].trim();
+                    let customerName = customerMatch[1].trim();
+                    // Clean up any extra text
+                    customerName = customerName.replace(/['s]+$/, '').trim();
                     console.log('PromiseTimeContent.js - Extracted customer name:', customerName);
                     return customerName;
+                } else {
+                    console.log('PromiseTimeContent.js - No customer match found for title:', titleText);
                 }
             }
             
@@ -715,34 +735,32 @@
                                 if (ampm.toLowerCase() === 'am' && hour24 === 12) hour24 = 0;
                             }
                             
-                            // Smart year detection logic
+                            // Smart year detection logic - for Sep 30 when today is Sep 29, use current year
                             const now = new Date();
-                            let year = now.getFullYear();
+                            let year = now.getFullYear(); // 2025
                             
                             // Create initial date for this year
                             let testDate = new Date(year, monthNum, parseInt(day), hour24, parseInt(minute));
                             
-                            // If the date/time is in the past, check if it's within the next 7 days
+                            // If the date is in the past by more than 1 day, try next year
+                            // But if it's within 48 hours, keep current year (handles tomorrow)
                             if (testDate < now) {
-                                // If it's less than 7 days ago, it probably means next occurrence (tomorrow, next week, etc.)
-                                const daysDiff = (now - testDate) / (24 * 60 * 60 * 1000);
-                                if (daysDiff <= 7) {
-                                    // Try next year only if it's been more than a few days
-                                    const futureDate = new Date(year + 1, monthNum, parseInt(day), hour24, parseInt(minute));
-                                    // If future date is more than 300 days away, use this year instead
-                                    const futureDaysDiff = (futureDate - now) / (24 * 60 * 60 * 1000);
-                                    if (futureDaysDiff > 300) {
-                                        testDate = testDate; // Keep this year's date
-                                    } else {
-                                        testDate = futureDate; // Use next year
-                                    }
-                                } else {
-                                    // If it's been weeks/months, definitely next year
+                                const hoursDiff = (now - testDate) / (1000 * 60 * 60);
+                                console.log('PromiseTimeContent.js - Date is in past by hours:', hoursDiff);
+                                
+                                if (hoursDiff > 48) {
+                                    // More than 2 days ago, use next year
                                     testDate = new Date(year + 1, monthNum, parseInt(day), hour24, parseInt(minute));
+                                    console.log('PromiseTimeContent.js - Using next year:', testDate);
+                                } else {
+                                    // Less than 48 hours ago, probably means today/tomorrow - keep current year
+                                    console.log('PromiseTimeContent.js - Keeping current year (within 48h):', testDate);
                                 }
+                            } else {
+                                console.log('PromiseTimeContent.js - Date is in future, using current year:', testDate);
                             }
                             
-                            console.log('PromiseTimeContent.js - Parsed short format:', testDate);
+                            console.log('PromiseTimeContent.js - Final parsed date:', testDate);
                             return testDate;
                         }
                     }
