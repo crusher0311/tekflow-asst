@@ -18,9 +18,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Initialize Promise Time monitoring
-    initializePromiseTimeMonitor();
-    
     // Initialize Promise Time Dashboard
     initializePromiseTimeDashboard();
     
@@ -147,16 +144,33 @@ function loadDashboardData() {
         
         // Then load the refreshed data
         chrome.storage.local.get(['promiseTimeDashboardData'], (result) => {
+            console.log('loadDashboardData - Raw storage data:', result);
             const dashboardData = result.promiseTimeDashboardData || [];
+            console.log('loadDashboardData - Dashboard data:', dashboardData);
+            console.log('loadDashboardData - Dashboard data length:', dashboardData.length);
+            
             const listContainer = document.querySelector('#promise-dashboard-content #promiseTimeList');
             const countElement = document.querySelector('#promise-dashboard-content #dashboardCount');
             
             if (!listContainer || !countElement) return;
             
-            // Update count
-            countElement.textContent = dashboardData.length > 0 
-                ? `${dashboardData.length} active promise time${dashboardData.length === 1 ? '' : 's'}`
-                : 'No active promise times';
+            // Update count with expired items consideration
+            const expiredCount = dashboardData.filter(item => item.isExpired).length;
+            const activeCount = dashboardData.length - expiredCount;
+            
+            console.log('loadDashboardData - Active count:', activeCount, 'Expired count:', expiredCount);
+            
+            let countText = '';
+            if (dashboardData.length === 0) {
+                countText = 'No active promise times';
+            } else if (expiredCount > 0 && activeCount > 0) {
+                countText = `${activeCount} active, ${expiredCount} expired promise time${(activeCount + expiredCount) === 1 ? '' : 's'}`;
+            } else if (expiredCount > 0) {
+                countText = `${expiredCount} expired promise time${expiredCount === 1 ? '' : 's'}`;
+            } else {
+                countText = `${activeCount} active promise time${activeCount === 1 ? '' : 's'}`;
+            }
+            countElement.textContent = countText;
             
             // Clear existing items
             listContainer.innerHTML = '';

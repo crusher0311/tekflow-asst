@@ -547,6 +547,18 @@ textarea {
   background-color: rgba(56, 161, 105, 0.1);
 }
 
+.promise-item.expired {
+  border-left: 4px solid #dc2626;
+  background-color: rgba(220, 38, 38, 0.15);
+  border: 2px solid #dc2626;
+  animation: pulse-expired 2s infinite;
+}
+
+@keyframes pulse-expired {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
 .promise-header {
   display: flex;
   justify-content: space-between;
@@ -580,6 +592,18 @@ textarea {
 .promise-time.safe {
   color: white;
   background-color: var(--accent-green);
+}
+
+.promise-time.expired {
+  color: white;
+  background-color: #dc2626;
+  font-weight: bold;
+  animation: blink-expired 1s infinite;
+}
+
+@keyframes blink-expired {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0.6; }
 }
 
 .promise-customer {

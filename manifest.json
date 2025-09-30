@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "TekFlow Assistant",
-  "version": "0.3.5",
+  "version": "0.3.6",
   "description": "Enhanced Tekmetric workflow assistant with customer concern management and promise time monitoring",
   "permissions": [
     "sidePanel",

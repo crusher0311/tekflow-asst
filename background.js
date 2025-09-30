@@ -403,8 +403,12 @@ function updatePromiseTimeDashboard() {
                     urgencyLevel: getUrgencyLevel(timeRemaining)
                 };
             })
-            .filter(item => !item.isExpired) // Remove expired ones
-            .sort((a, b) => a.timeRemaining - b.timeRemaining); // Sort by urgency (least time first)
+            .sort((a, b) => {
+                // Sort expired items first (most urgent), then by time remaining
+                if (a.isExpired && !b.isExpired) return -1;
+                if (!a.isExpired && b.isExpired) return 1;
+                return a.timeRemaining - b.timeRemaining;
+            }); // Sort expired first, then by urgency (least time first)
         
         // Update storage with cleaned data
         const cleanedTracking = activePromises.map(item => {
@@ -426,6 +430,7 @@ function updatePromiseTimeDashboard() {
 function getUrgencyLevel(timeRemaining) {
     const minutes = timeRemaining / (1000 * 60);
     
+    if (minutes <= 0) return 'expired';  // New: expired status
     if (minutes <= 30) return 'urgent';
     if (minutes <= 60) return 'warning';
     return 'safe';
@@ -445,24 +450,50 @@ function checkForPromiseTimeNotifications(activePromises) {
         
         activePromises.forEach(promise => {
             const minutesRemaining = Math.floor(promise.timeRemaining / (1000 * 60));
+            const secondsRemaining = Math.floor(promise.timeRemaining / 1000);
             const roId = promise.roId;
             
-            console.log(`Background.js - Checking RO ${promise.repairOrderNumber}: ${minutesRemaining} minutes remaining`);
+            console.log(`Background.js - Checking RO ${promise.repairOrderNumber}:`);
+            console.log(`  Time remaining: ${minutesRemaining} minutes (${secondsRemaining} seconds)`);
+            console.log(`  Raw milliseconds: ${promise.timeRemaining}`);
             
             alertIntervals.forEach(interval => {
-                // More flexible trigger logic - trigger when crossing the threshold
-                const shouldTrigger = minutesRemaining <= interval && minutesRemaining >= 0;
+                // More precise trigger logic: trigger only when exactly crossing the threshold
+                let shouldTrigger = false;
+                
+                if (interval === 1) {
+                    // 1-minute alert: trigger when 0-1 minutes remaining
+                    shouldTrigger = minutesRemaining <= 1;
+                } else if (interval === 5) {
+                    // 5-minute alert: trigger when 4-5 minutes remaining
+                    shouldTrigger = minutesRemaining <= 5 && minutesRemaining > 3;
+                } else if (interval === 10) {
+                    // 10-minute alert: trigger when 9-10 minutes remaining
+                    shouldTrigger = minutesRemaining <= 10 && minutesRemaining > 8;
+                } else if (interval === 30) {
+                    // 30-minute alert: trigger when 29-30 minutes remaining
+                    shouldTrigger = minutesRemaining <= 30 && minutesRemaining > 28;
+                } else if (interval === 60) {
+                    // 60-minute alert: trigger when 59-60 minutes remaining
+                    shouldTrigger = minutesRemaining <= 60 && minutesRemaining > 58;
+                } else {
+                    // Generic logic for other intervals
+                    shouldTrigger = minutesRemaining <= interval && minutesRemaining > (interval - 2);
+                }
+                
                 const notificationKey = `${roId}_${interval}`;
                 const alreadyNotified = lastCheck[notificationKey];
                 
-                console.log(`Background.js - Interval ${interval}: shouldTrigger=${shouldTrigger}, alreadyNotified=${!!alreadyNotified}`);
+                console.log(`Background.js - Interval ${interval}min: minutes=${minutesRemaining}, shouldTrigger=${shouldTrigger}, alreadyNotified=${!!alreadyNotified}`);
                 
                 if (shouldTrigger && !alreadyNotified) {
-                    console.log(`Background.js - TRIGGERING notification for RO ${promise.repairOrderNumber}: ${interval} minute alert`);
+                    console.log(`Background.js - 🔔 TRIGGERING notification for RO ${promise.repairOrderNumber}: ${interval} minute alert`);
                     showPromiseTimeNotification(promise, interval);
                     lastCheck[notificationKey] = currentTime;
                 } else if (shouldTrigger && alreadyNotified) {
-                    console.log(`Background.js - Skipping notification for RO ${promise.repairOrderNumber}: ${interval} minute alert (already notified)`);
+                    console.log(`Background.js - ⏭️ Skipping notification for RO ${promise.repairOrderNumber}: ${interval} minute alert (already notified)`);
+                } else {
+                    console.log(`Background.js - ❌ No trigger for ${interval}min: minutes=${minutesRemaining}, not in range`);
                 }
             });
         });
@@ -496,27 +527,48 @@ function showPromiseTimeNotification(promise, minutesRemaining) {
         message = `📋 Promise time reminder: ${minutesRemaining} minutes remaining\nCustomer: ${promise.customerFullName}\nVehicle: ${promise.vehicleDescription}`;
     }
     
-    const notificationId = `promise_${promise.roId}_${minutesRemaining}`;
+    const notificationId = `promise_${promise.roId}_${minutesRemaining}_${Date.now()}`;
     console.log(`Background.js - Creating notification with ID: ${notificationId}`);
     
-    chrome.notifications.create(notificationId, {
-        type: 'basic',
-        iconUrl: 'images/icon48.png',
-        title: title,
-        message: message,
-        priority: minutesRemaining <= 5 ? 2 : 1, // High priority for urgent notifications
-        requireInteraction: minutesRemaining <= 5 // Keep urgent notifications visible
-    }, (notificationId) => {
-        if (chrome.runtime.lastError) {
-            console.error('Background.js - Error creating notification:', chrome.runtime.lastError);
-        } else {
-            console.log(`Background.js - Notification created successfully: ${notificationId}`);
-            
-            // Add audio alert for urgent notifications
-            if (minutesRemaining <= 5) {
-                playAudioAlert(minutesRemaining);
+    // Clear any existing notifications for this RO to avoid clutter
+    chrome.notifications.clear(`promise_${promise.roId}_${minutesRemaining}`, () => {
+        // Create new notification with enhanced Windows visibility
+        chrome.notifications.create(notificationId, {
+            type: 'basic',
+            iconUrl: 'images/icon48.png',
+            title: title,
+            message: message,
+            priority: minutesRemaining <= 5 ? 2 : 1, // High priority for urgent notifications
+            requireInteraction: minutesRemaining <= 5, // Keep urgent notifications visible
+            silent: false, // Ensure sound plays
+            eventTime: Date.now() + 60000 // Keep visible for 1 minute
+        }, (notificationId) => {
+            if (chrome.runtime.lastError) {
+                console.error('Background.js - Error creating notification:', chrome.runtime.lastError);
+            } else {
+                console.log(`Background.js - Notification created successfully: ${notificationId}`);
+                
+                // Add audio alert for urgent notifications
+                if (minutesRemaining <= 5) {
+                    playAudioAlert(minutesRemaining);
+                }
+                
+                // For Windows: Try to bring extension to front for urgent notifications
+                if (minutesRemaining <= 1) {
+                    try {
+                        chrome.action.setBadgeText({text: '!'});
+                        chrome.action.setBadgeBackgroundColor({color: '#ff0000'});
+                        
+                        // Clear badge after 30 seconds
+                        setTimeout(() => {
+                            chrome.action.setBadgeText({text: ''});
+                        }, 30000);
+                    } catch (error) {
+                        console.log('Background.js - Could not set badge:', error);
+                    }
+                }
             }
-        }
+        });
     });
 }
 
