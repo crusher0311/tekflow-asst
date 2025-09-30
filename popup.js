@@ -4,7 +4,27 @@ import { handleSubmitConcern, submitConversationForReview, handleDone, copyConve
 document.addEventListener('DOMContentLoaded', function() {
     chrome.storage.sync.get(['theme'], function(result) {
         const theme = result.theme || 'dark';
-        document.documentElement.setAttribute('data-theme', theme);
+        document.documentElement.sefunction updatePromiseTimeDisplay(data) {
+    const monitorSection = document.getElementById('promise-time-monitor');
+    const customerNameSpan = document.getElementById('ptCustomerName');
+    const vehicleSpan = document.getElementById('ptVehicle');
+    const timeRemainingSpan = document.getElementById('ptTimeRemaining');
+    const openROButton = document.getElementById('openRepairOrderButton');
+
+    if (data.customerTimeOut && monitorSection) {
+        const timeoutDate = new Date(data.customerTimeOut);
+        const currentTime = new Date();
+        
+        // DEBUG: Show time comparison
+        console.log('=== PROMISE TIME DISPLAY DEBUG ===');
+        console.log('Stored promise time:', data.customerTimeOut);
+        console.log('Parsed promise date:', timeoutDate.toString());
+        console.log('Current time:', currentTime.toString());
+        console.log('Time difference (ms):', timeoutDate.getTime() - currentTime.getTime());
+        console.log('Time difference (hours):', (timeoutDate.getTime() - currentTime.getTime()) / (1000 * 60 * 60));
+        console.log('=====================================');
+        
+        const timeLeft = timeoutDate - currentTime;'data-theme', theme);
     });
 
     // Add Enter key event listener for concern input

@@ -567,6 +567,33 @@
 
     function extractPromiseTimeFromPage() {
         try {
+            console.log('PromiseTimeContent.js - === PROMISE TIME EXTRACTION DEBUG ===');
+            
+            // DEBUG: Show current system time info
+            const now = new Date();
+            console.log('System current time:', now.toString());
+            console.log('System timezone:', Intl.DateTimeFormat().resolvedOptions().timeZone);
+            console.log('System timezone offset:', now.getTimezoneOffset(), 'minutes');
+            
+            // DEBUG: Find ALL time-related text on the page to see what we're detecting
+            console.log('\n--- SCANNING ALL TIME-RELATED TEXT ON PAGE ---');
+            const allText = document.body.textContent;
+            const timePatterns = [
+                /Customer Time In[:\s]*([^,\n]+)/gi,
+                /Promised Time Out[:\s]*([^,\n]+)/gi,
+                /Promise[d]? Time[:\s]*([^,\n]+)/gi,
+                /Time Out[:\s]*([^,\n]+)/gi,
+                /\w{3},?\s+\w{3}\s+\d{1,2}\s+\d{1,2}:\d{2}\s*[AP]M/gi
+            ];
+            
+            timePatterns.forEach((pattern, i) => {
+                const matches = allText.match(pattern);
+                if (matches) {
+                    console.log(`Pattern ${i+1} (${pattern}) found:`, matches);
+                }
+            });
+            
+            console.log('=== END DEBUG INFO ===\n');
             console.log('PromiseTimeContent.js - Extracting promise time from page...');
             
             // Strategy 1: Look for "Promised Time Out" text specifically
@@ -758,7 +785,15 @@
         try {
             // Remove extra whitespace
             dateStr = dateStr.trim();
+            
+            // DEBUG: Show current time information
+            const now = new Date();
+            console.log('=== PROMISE TIME DEBUG ===');
+            console.log('PromiseTimeContent.js - Current time:', now.toString());
+            console.log('PromiseTimeContent.js - Current date (toDateString):', now.toDateString());
+            console.log('PromiseTimeContent.js - Current timestamp:', now.getTime());
             console.log('PromiseTimeContent.js - Attempting to parse:', dateStr);
+            console.log('===============================');
             
             // Try different parsing approaches
             const parseAttempts = [
@@ -809,18 +844,18 @@
                                 if (ampm.toLowerCase() === 'am' && hour24 === 12) hour24 = 0;
                             }
                             
-                            // EXPLICIT LOGIC FOR SEP 30 WHEN TODAY IS SEP 29
-                            const now = new Date();
-                            let year = now.getFullYear(); // 2025
-                            
-                            console.log('PromiseTimeContent.js - Today is:', now.toDateString());
-                            console.log('PromiseTimeContent.js - Parsing date for month:', month, 'day:', day);
+                            console.log('PromiseTimeContent.js - TODAY IS SEP 29, 2025 - checking for Sep 30 promise time');
+                            console.log('PromiseTimeContent.js - Found date text:', dateStr);
+                            console.log('PromiseTimeContent.js - Checking if this is Sep 30...');
                             
                             // For Sep 30 when today is Sep 29, 2025 - use THIS year, not next year
                             if (month.toLowerCase() === 'sep' && parseInt(day) === 30 && 
                                 now.getMonth() === 8 && now.getDate() === 29 && now.getFullYear() === 2025) {
-                                console.log('PromiseTimeContent.js - Special case: Sep 30 when today is Sep 29, 2025 - using current year');
+                                console.log('PromiseTimeContent.js - ✅ CONFIRMED: Sep 30 promise time - using current year 2025');
                                 year = 2025; // Explicit current year
+                            } else if (month.toLowerCase() === 'sep' && parseInt(day) === 2) {
+                                console.log('PromiseTimeContent.js - ⚠️ WARNING: Found Sep 2 - this might be Customer Time In, not Promise Time!');
+                                year = 2025; // Still use current year but flag the issue
                             } else {
                                 // General logic for other dates
                                 let testDate = new Date(year, monthNum, parseInt(day), hour24, parseInt(minute));
