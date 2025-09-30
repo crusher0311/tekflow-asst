@@ -377,12 +377,24 @@ function updatePromiseTimeDashboard() {
     chrome.storage.local.get(['promiseTimeTracking'], (result) => {
         const tracking = result.promiseTimeTracking || [];
         const currentTime = Date.now();
+        const currentTimeReadable = new Date(currentTime).toLocaleString();
+        
+        console.log(`Background.js - updatePromiseTimeDashboard: Current time is ${currentTimeReadable}`);
+        console.log(`Background.js - Processing ${tracking.length} promise time entries`);
         
         // Filter out expired timeouts and calculate remaining time
         const activePromises = tracking
             .map(item => {
                 const timeoutDate = new Date(item.customerTimeOut).getTime();
+                const timeoutDateReadable = new Date(timeoutDate).toLocaleString();
                 const timeRemaining = timeoutDate - currentTime;
+                const minutesRemaining = Math.floor(timeRemaining / (1000 * 60));
+                
+                console.log(`Background.js - RO ${item.repairOrderNumber}:`);
+                console.log(`  Promise Time: ${timeoutDateReadable}`);
+                console.log(`  Current Time: ${currentTimeReadable}`);
+                console.log(`  Time Remaining: ${minutesRemaining} minutes (${timeRemaining}ms)`);
+                console.log(`  Is Expired: ${timeRemaining <= 0}`);
                 
                 return {
                     ...item,

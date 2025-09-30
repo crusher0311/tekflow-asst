@@ -67,13 +67,13 @@ function createPromiseTimeDashboardContent() {
     dashboardDiv.innerHTML = `
         <div id="dashboard-header">
                         <div style="display: flex; align-items: center; justify-content: flex-start; margin-bottom: 15px;">
-                <button id="backToConcernBtn" style="background-color: var(--accent-blue); color: white; border: none; padding: 4px 6px; border-radius: var(--radius); cursor: pointer; transition: background-color 0.2s; font-size: 12px; line-height: 1; margin-right: 6px; min-width: 24px;">←</button>
+                <button id="backToConcernBtn" style="background-color: var(--accent-blue); color: white; border: none; padding: 2px; border-radius: var(--radius); cursor: pointer; transition: background-color 0.2s; font-size: 12px; line-height: 1; margin-right: 10px; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;">←</button>
                 <h2 style="color: var(--text-primary); margin: 0; font-size: 16px; white-space: nowrap;">Promise Time Dashboard</h2>
             </div>
             <div style="display: flex; gap: 8px; margin-bottom: 20px;">
                 <button id="refreshDashboardBtn" style="background-color: var(--accent-green); color: white; border: none; padding: 8px 16px; border-radius: var(--radius); cursor: pointer; transition: background-color 0.2s;">🔄 Refresh</button>
                 <button id="scanCurrentPageBtn" style="background-color: var(--accent-blue); color: white; border: none; padding: 8px 16px; border-radius: var(--radius); cursor: pointer; transition: background-color 0.2s;">🔍 Scan Current Page</button>
-                <button id="testNotificationsBtn" style="background-color: #ff6b6b; color: white; border: none; padding: 8px 12px; border-radius: var(--radius); cursor: pointer; transition: background-color 0.2s; font-size: 12px;">🔔 Test</button>
+                <button id="testNotificationsBtn" style="background-color: var(--bg-tertiary); color: var(--text-muted); border: 1px solid var(--border-color); padding: 4px 8px; border-radius: var(--radius); cursor: pointer; transition: all 0.2s; font-size: 11px;" title="Test notifications">🔔</button>
             </div>
             <div id="dashboardCount" style="color: var(--text-muted); margin-bottom: 15px; font-size: 14px;">Loading...</div>
         </div>
@@ -99,8 +99,14 @@ function createPromiseTimeDashboardContent() {
         refreshBtn?.addEventListener('mouseleave', (e) => e.target.style.backgroundColor = 'var(--accent-green)');
         scanBtn?.addEventListener('mouseenter', (e) => e.target.style.backgroundColor = 'var(--accent-blue-hover)');
         scanBtn?.addEventListener('mouseleave', (e) => e.target.style.backgroundColor = 'var(--accent-blue)');
-        testBtn?.addEventListener('mouseenter', (e) => e.target.style.backgroundColor = '#e53e3e');
-        testBtn?.addEventListener('mouseleave', (e) => e.target.style.backgroundColor = '#ff6b6b');
+        testBtn?.addEventListener('mouseenter', (e) => {
+            e.target.style.backgroundColor = 'var(--border-color)';
+            e.target.style.color = 'var(--text-primary)';
+        });
+        testBtn?.addEventListener('mouseleave', (e) => {
+            e.target.style.backgroundColor = 'var(--bg-tertiary)';
+            e.target.style.color = 'var(--text-muted)';
+        });
         
         backBtn?.addEventListener('click', closeDashboard);
         refreshBtn?.addEventListener('click', () => {
