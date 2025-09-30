@@ -289,7 +289,18 @@ let currentEditingIndex = -1; // Track which alert is being edited
 // Load and display Promise Time alerts
 function loadPromiseTimeAlerts() {
     chrome.storage.local.get(['promiseTimeAlerts'], (data) => {
-        const alerts = data.promiseTimeAlerts || [60, 30, 10, 5, 1]; // Default intervals in minutes
+        let alerts = data.promiseTimeAlerts;
+        
+        console.log('Loading promise time alerts:', alerts);
+        
+        // Only set defaults if storage is completely empty OR undefined (first time ever)
+        if (!alerts) {
+            alerts = [60, 30, 10, 5, 1]; // Default intervals in minutes
+            console.log('Setting default alerts:', alerts);
+            // Save defaults to storage
+            chrome.storage.local.set({ promiseTimeAlerts: alerts });
+        }
+        
         displayAlertIntervals(alerts);
     });
 }
@@ -308,10 +319,17 @@ function displayAlertIntervals(intervals) {
         intervalDiv.innerHTML = `
             <div class="interval-time">${timeText} before timeout</div>
             <div class="interval-actions">
-                <button class="alert-button" onclick="editAlert(${index})">Edit</button>
-                <button class="remove-button" onclick="removeAlert(${index})">Remove</button>
+                <button class="alert-button" data-index="${index}">Edit</button>
+                <button class="remove-button" data-index="${index}">Remove</button>
             </div>
         `;
+
+        // Add event listeners for the buttons
+        const editButton = intervalDiv.querySelector('.alert-button');
+        const removeButton = intervalDiv.querySelector('.remove-button');
+        
+        editButton.addEventListener('click', () => editAlert(index));
+        removeButton.addEventListener('click', () => removeAlert(index));
 
         intervalList.appendChild(intervalDiv);
     });
@@ -436,10 +454,6 @@ function saveAlertTime() {
     });
 }
 
-// Make functions globally available
-window.editAlert = editAlert;
-window.removeAlert = removeAlert;
-
 // Event listeners for Promise Time functionality
 document.getElementById('addInterval').addEventListener('click', addNewAlert);
 
@@ -456,8 +470,16 @@ window.addEventListener('click', (event) => {
     }
 });
 
-// Save intervals button (legacy compatibility)
+// Save intervals button (show success message)
 document.getElementById('saveIntervals').addEventListener('click', () => {
-    // Just reload to show current state
-    loadPromiseTimeAlerts();
+    // Show success message without reloading
+    const saveBtn = document.getElementById('saveIntervals');
+    const originalText = saveBtn.textContent;
+    saveBtn.textContent = 'Intervals Saved!';
+    saveBtn.style.backgroundColor = 'var(--accent-green)';
+    
+    setTimeout(() => {
+        saveBtn.textContent = originalText;
+        saveBtn.style.backgroundColor = '';
+    }, 1500);
 });

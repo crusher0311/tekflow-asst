@@ -25,7 +25,7 @@ document.addEventListener('DOMContentLoaded', function() {
     initializePromiseTimeDashboard();
     
     // Add event listener for Promise Time Dashboard button
-    const promiseTimeDashboardBtn = document.getElementById('promiseTimeDashboardBtn');
+    const promiseTimeDashboardBtn = document.getElementById('openPromiseDashboardButton');
     if (promiseTimeDashboardBtn) {
         promiseTimeDashboardBtn.addEventListener('click', openPromiseTimeDashboard);
     }
