@@ -226,13 +226,6 @@
         </div>
     </div>
 
-    <script>
-        // Initialize theme
-        chrome.storage.sync.get(['theme'], function(result) {
-            const theme = result.theme || 'dark';
-            document.documentElement.setAttribute('data-theme', theme);
-        });
-    </script>
     <script src="promiseTimeDashboard.js"></script>
 </body>
 </html>

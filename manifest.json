@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "TekFlow Assistant",
-  "version": "0.3.7",
+  "version": "0.4.9",
   "description": "Enhanced Tekmetric workflow assistant with customer concern management and promise time monitoring",
   "permissions": [
     "sidePanel",
@@ -11,7 +11,8 @@
     "scripting",
     "webRequest",
     "webNavigation",
-    "notifications"
+    "notifications",
+    "system.display"
   ],
   "background": {
     "service_worker": "background.js"
@@ -49,7 +50,10 @@
       "matches": ["https://shop.tekmetric.com/admin/shop/*/repair-orders/*"],
       "js": ["promiseTimeContent.js"]
     }
-  ]
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  }
 }
 
 

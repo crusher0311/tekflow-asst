@@ -1,5 +1,11 @@
 // File: promiseTimeDashboard.js - Promise Time Dashboard Popup
 
+// Initialize theme on page load
+chrome.storage.sync.get(['theme'], function(result) {
+    const theme = result.theme || 'dark';
+    document.documentElement.setAttribute('data-theme', theme);
+});
+
 // Initialize dashboard when page loads
 document.addEventListener('DOMContentLoaded', function() {
     initializeDashboard();
@@ -9,7 +15,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 function initializeDashboard() {
     // Update dashboard every minute
-    setInterval(updateDashboardDisplay, 60000);
+    setInterval(updateDashboardDisplay, 5000);
     
     // Listen for storage changes
     chrome.storage.onChanged.addListener((changes, namespace) => {

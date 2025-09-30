@@ -79,6 +79,22 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         });
         return true;
     }
+    
+    if (message.action === 'clearBlinkingBadge') {
+        console.log('Background.js - Manual badge clear requested');
+        clearBlinkingBadge();
+        // Force recheck of expired items
+        setTimeout(checkExpiredPromiseTimes, 100);
+        sendResponse({status: 'badge_cleared'});
+        return true;
+    }
+    
+    if (message.action === 'forceExpiredCheck') {
+        console.log('Background.js - Forced expired items check requested');
+        checkExpiredPromiseTimes();
+        sendResponse({status: 'expired_check_completed'});
+        return true;
+    }
 });
 
 // ===============================
@@ -278,7 +294,7 @@ function startTimeoutCheck(customerTimeOut) {
                     }
                 });
             }
-        }, 60 * 1000); // Check every minute
+        }, 5 * 1000); // Check every 5 seconds
     });
 }
 
@@ -474,8 +490,8 @@ function checkForPromiseTimeNotifications(activePromises) {
                     // 30-minute alert: trigger when 29-30 minutes remaining
                     shouldTrigger = minutesRemaining <= 30 && minutesRemaining > 28;
                 } else if (interval === 60) {
-                    // 60-minute alert: trigger when 59-60 minutes remaining
-                    shouldTrigger = minutesRemaining <= 60 && minutesRemaining > 58;
+                    // 60-minute alert: trigger when 58-62 minutes remaining (wider window for reliability)
+                    shouldTrigger = minutesRemaining <= 62 && minutesRemaining >= 58;
                 } else {
                     // Generic logic for other intervals
                     shouldTrigger = minutesRemaining <= interval && minutesRemaining > (interval - 2);
@@ -548,9 +564,14 @@ function showPromiseTimeNotification(promise, minutesRemaining) {
             } else {
                 console.log(`Background.js - Notification created successfully: ${notificationId}`);
                 
-                // Add audio alert for urgent notifications
-                if (minutesRemaining <= 5) {
-                    playAudioAlert(minutesRemaining);
+                // Play audio alert for ALL interval notifications (60, 30, 10, 5, 1 minutes)
+                console.log(`Background.js - Playing audio alert for ${minutesRemaining} minutes remaining`);
+                playAudioAlert(minutesRemaining);
+                
+                // Create popup window for important alerts (60, 30, 10, 5, 1 minutes)
+                if ([60, 30, 10, 5, 1].includes(minutesRemaining)) {
+                    console.log(`Background.js - Creating popup window for ${minutesRemaining} minute alert`);
+                    createAlertPopup(promise, minutesRemaining);
                 }
                 
                 // For Windows: Try to bring extension to front for urgent notifications
@@ -584,52 +605,80 @@ function playAudioAlert(minutesRemaining) {
                 chrome.scripting.executeScript({
                     target: { tabId: tabs[0].id },
                     func: (minutes) => {
-                        // Create audio context and play alert tone
-                        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                        console.log(`Playing audio alert for ${minutes} minutes remaining`);
                         
-                        // Play different tones based on urgency
-                        const frequencies = minutes <= 1 ? [800, 1000, 800, 1000] : [600, 800]; // More urgent = more beeps
-                        let beepIndex = 0;
-                        
-                        function playBeep(frequency, duration = 200) {
-                            const oscillator = audioContext.createOscillator();
-                            const gainNode = audioContext.createGain();
+                        try {
+                            // Create audio context and play alert tone
+                            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
                             
-                            oscillator.connect(gainNode);
-                            gainNode.connect(audioContext.destination);
+                            // Resume audio context if suspended (required for Chrome)
+                            if (audioContext.state === 'suspended') {
+                                audioContext.resume().then(() => {
+                                    console.log('Audio context resumed');
+                                    playBeeps();
+                                });
+                            } else {
+                                playBeeps();
+                            }
                             
-                            oscillator.frequency.value = frequency;
-                            oscillator.type = 'sine';
+                            function playBeeps() {
+                                // Play different tones based on urgency
+                                const frequencies = minutes <= 5 ? [800, 1000, 800, 1000] : [600, 800]; 
+                                let beepIndex = 0;
+                                
+                                function playBeep(frequency, duration = 300) {
+                                    const oscillator = audioContext.createOscillator();
+                                    const gainNode = audioContext.createGain();
+                                    
+                                    oscillator.connect(gainNode);
+                                    gainNode.connect(audioContext.destination);
+                                    
+                                    oscillator.frequency.value = frequency;
+                                    oscillator.type = 'sine';
+                                    
+                                    gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+                                    gainNode.gain.linearRampToValueAtTime(0.2, audioContext.currentTime + 0.01);
+                                    gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + duration / 1000);
+                                    
+                                    oscillator.start(audioContext.currentTime);
+                                    oscillator.stop(audioContext.currentTime + duration / 1000);
+                                    
+                                    console.log(`Played beep ${beepIndex + 1} at ${frequency}Hz`);
+                                    
+                                    beepIndex++;
+                                    if (beepIndex < frequencies.length) {
+                                        setTimeout(() => playBeep(frequencies[beepIndex]), duration + 100);
+                                    }
+                                }
+                                
+                                playBeep(frequencies[0]);
+                            }
+                        } catch (error) {
+                            console.error('Audio alert error:', error);
                             
-                            gainNode.gain.setValueAtTime(0, audioContext.currentTime);
-                            gainNode.gain.linearRampToValueAtTime(0.1, audioContext.currentTime + 0.01);
-                            gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + duration / 1000);
-                            
-                            oscillator.start(audioContext.currentTime);
-                            oscillator.stop(audioContext.currentTime + duration / 1000);
-                            
-                            return new Promise(resolve => {
-                                oscillator.onended = resolve;
-                            });
-                        }
-                        
-                        async function playSequence() {
-                            for (const freq of frequencies) {
-                                await playBeep(freq);
-                                await new Promise(resolve => setTimeout(resolve, 100)); // Short pause between beeps
+                            // Fallback: Try to play a simple beep using system bell
+                            try {
+                                const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBjaAy/DQgDAFIWmz8N2PQAoUXrTp66hVFApGn+DyvmwhBTp1wPDGgjQGI2mk7+CZQQQ=');
+                                audio.play().catch(e => console.log('Fallback audio failed:', e));
+                            } catch (fallbackError) {
+                                console.log('All audio methods failed');
                             }
                         }
-                        
-                        playSequence().catch(err => console.log('Audio alert error:', err));
                     },
                     args: [minutesRemaining]
-                }).catch(err => {
-                    console.log('Background.js - Could not play audio alert:', err);
+                }, (result) => {
+                    if (chrome.runtime.lastError) {
+                        console.error('Background.js - Error injecting audio script:', chrome.runtime.lastError);
+                    } else {
+                        console.log('Background.js - Audio script injected successfully');
+                    }
                 });
+            } else {
+                console.log('Background.js - No active tab found for audio alert');
             }
         });
     } catch (error) {
-        console.log('Background.js - Audio alert error:', error);
+        console.error('Background.js - Error setting up audio alert:', error);
     }
 }
 
@@ -658,5 +707,174 @@ chrome.notifications.onClicked.addListener((notificationId) => {
     }
 });
 
+// Check for expired promise times and set blinking hazard badge
+function checkExpiredPromiseTimes() {
+    chrome.storage.local.get(['promiseTimeDashboardData'], (result) => {
+        const dashboardData = result.promiseTimeDashboardData || [];
+        const currentTime = Date.now();
+        
+        const expiredItems = dashboardData.filter(item => {
+            const promiseTime = new Date(item.customerTimeOut).getTime();
+            return promiseTime <= currentTime;
+        });
+        
+        console.log(`Background.js - Checking expired items: ${expiredItems.length} of ${dashboardData.length} total`);
+        
+        if (expiredItems.length > 0) {
+            console.log(`Background.js - Found ${expiredItems.length} expired promise time(s):`);
+            expiredItems.forEach(item => {
+                console.log(`  - RO #${item.repairOrderNumber}: expired ${Math.round((currentTime - new Date(item.customerTimeOut).getTime()) / (1000 * 60))} minutes ago`);
+            });
+            setBlinkingHazardBadge(expiredItems.length);
+        } else {
+            console.log('Background.js - No expired items found, clearing badge');
+            clearBlinkingBadge();
+        }
+    });
+}
+
+let blinkInterval = null;
+
+function clearBlinkingBadge() {
+    // Clear any existing blink interval
+    if (blinkInterval) {
+        clearInterval(blinkInterval);
+        blinkInterval = null;
+        console.log('Background.js - Cleared blinking badge interval');
+    }
+    
+    // Clear the badge completely
+    chrome.action.setBadgeText({text: ''});
+    chrome.action.setBadgeBackgroundColor({color: '#666666'}); // Reset to default
+}
+
+function setBlinkingHazardBadge(expiredCount) {
+    // Clear any existing blink interval first
+    clearBlinkingBadge();
+    
+    let isVisible = true;
+    
+    blinkInterval = setInterval(() => {
+        if (isVisible) {
+            chrome.action.setBadgeText({text: '⚠️'});
+            chrome.action.setBadgeBackgroundColor({color: '#ff0000'});
+        } else {
+            chrome.action.setBadgeText({text: ''});
+        }
+        isVisible = !isVisible;
+    }, 1000); // Blink every second
+}
+
+// Start checking for expired items every 5 seconds
+setInterval(checkExpiredPromiseTimes, 5000);
+
+// Listen for changes to promise time data and immediately recheck expired items
+chrome.storage.onChanged.addListener((changes, namespace) => {
+    if (namespace === 'local' && changes.promiseTimeDashboardData) {
+        console.log('Background.js - Promise time data changed, rechecking expired items');
+        // Force immediate recheck when data changes
+        setTimeout(checkExpiredPromiseTimes, 100);
+    }
+});
+
+// Force initial check when background script starts
+setTimeout(checkExpiredPromiseTimes, 1000);
+
+// Create visible alert popup for critical notifications
+let activePopups = new Set(); // Track active popup windows by RO ID
+
+function createAlertPopup(promise, minutesRemaining) {
+    const popupKey = `${promise.roId}_${minutesRemaining}`;
+    
+    // Prevent duplicate popups for the same RO and interval
+    if (activePopups.has(popupKey)) {
+        console.log(`Background.js - Popup already exists for RO ${promise.repairOrderNumber} at ${minutesRemaining} minutes, skipping`);
+        return;
+    }
+    
+    activePopups.add(popupKey);
+    console.log(`Background.js - Creating alert popup for RO ${promise.repairOrderNumber}: ${minutesRemaining} minutes`);
+    
+    // Auto-cleanup: remove from activePopups after 5 minutes to prevent memory leaks
+    setTimeout(() => {
+        activePopups.delete(popupKey);
+        console.log(`Background.js - Auto-cleaned up popup key: ${popupKey}`);
+    }, 5 * 60 * 1000);
+    
+    // Store the promise data for the popup
+    chrome.storage.local.set({
+        customerTimeOut: promise.customerTimeOut,
+        serviceWriterName: promise.serviceWriterName,
+        customerFullName: promise.customerFullName,
+        repairOrderNumber: promise.repairOrderNumber,
+        vehicleDescription: promise.vehicleDescription,
+        roId: promise.roId,
+        alertMinutes: minutesRemaining
+    });
+    
+    // Create a popup window that's hard to miss
+    const popupUrl = chrome.runtime.getURL('promiseTimePopup.html');
+    
+    // Get display info to center the popup properly
+    if (chrome.system && chrome.system.display) {
+        chrome.system.display.getInfo((displays) => {
+            if (chrome.runtime.lastError) {
+                console.error('Background.js - Error getting display info:', chrome.runtime.lastError);
+                createPopupWindow(popupUrl, promise, 100, 100, popupKey); // Fallback positioning
+                return;
+            }
+            
+            const primaryDisplay = displays.find(d => d.isPrimary) || displays[0];
+            const centerX = Math.floor((primaryDisplay.bounds.width - 500) / 2); // Wider window for snooze function
+            const centerY = Math.floor((primaryDisplay.bounds.height - 450) / 3); // Taller window for snooze function
+            
+            createPopupWindow(popupUrl, promise, centerY, centerX, popupKey);
+        });
+    } else {
+        console.log('Background.js - system.display API not available, using fallback positioning');
+        createPopupWindow(popupUrl, promise, 100, 100, popupKey); // Fallback positioning
+    }
+}
+
+function createPopupWindow(popupUrl, promise, top, left, popupKey) {
+    chrome.windows.create({
+        url: popupUrl,
+        type: 'popup',
+        width: 500,  // Increased from 450 to show snooze function
+        height: 450, // Increased from 350 to show snooze function
+        focused: true, // Bring to front
+        top: top,
+        left: left,
+    }, (window) => {
+        if (chrome.runtime.lastError) {
+            console.error('Background.js - Error creating popup window:', chrome.runtime.lastError);
+            // Remove from active popups if creation failed
+            if (popupKey) {
+                activePopups.delete(popupKey);
+            }
+        } else {
+            console.log(`Background.js - Alert popup created for RO ${promise.repairOrderNumber} (${window.id})`);
+            
+            // Track window closure to clean up activePopups
+            if (popupKey) {
+                chrome.windows.onRemoved.addListener(function windowClosedHandler(windowId) {
+                    if (windowId === window.id) {
+                        activePopups.delete(popupKey);
+                        console.log(`Background.js - Popup window ${windowId} closed, removed ${popupKey} from active popups`);
+                        chrome.windows.onRemoved.removeListener(windowClosedHandler);
+                    }
+                });
+            }
+            
+            // For extra visibility, flash the popup window
+            setTimeout(() => {
+                if (window && window.id) {
+                    chrome.windows.update(window.id, { focused: true });
+                }
+            }, 500);
+        }
+    });
+}
+
 // Periodic dashboard update
-setInterval(updatePromiseTimeDashboard, 60000); // Update every minute
+setInterval(updatePromiseTimeDashboard, 5000); // Update every 5 seconds

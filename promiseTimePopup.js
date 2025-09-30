@@ -1,5 +1,13 @@
 // File: promiseTimePopup.js - Promise Time Alert Popup for TekFlow Assistant
 
+// Initialize theme on page load
+document.addEventListener('DOMContentLoaded', function() {
+    chrome.storage.sync.get(['theme'], function(result) {
+        const theme = result.theme || 'dark';
+        document.documentElement.setAttribute('data-theme', theme);
+    });
+});
+
 // Section 1: Retrieve Data from Local Storage and Initialize Popup
 chrome.storage.local.get(
     [
@@ -46,7 +54,7 @@ chrome.storage.local.get(
             }
 
             // Section 1.2: Update Timer Every Minute
-            setInterval(() => updateTimer(timeoutDate), 60 * 1000);
+            setInterval(() => updateTimer(timeoutDate), 5 * 1000);
         } else {
             document.getElementById('timer').textContent = 'No timeout set';
             document.getElementById('serviceWriter').textContent = 'N/A';

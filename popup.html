@@ -12,6 +12,9 @@
         <div id="logo-container">
             <img src="images/logo.png" alt="Customer Concern Assistant" id="logo">
             <h1>Customer Concern Assistant</h1>
+            <div class="button-container promise-times-container" style="margin-top: 10px; display: flex; justify-content: center;">
+                <button id="openPromiseDashboardButton" style="background-color: var(--accent-blue); color: white; padding: 6px 12px; font-size: 12px; border-radius: 4px; width: auto !important; display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0;">⏰ Promise Times</button>
+            </div>
         </div>
 
         <!-- Customer Concern Input Section -->
@@ -50,14 +53,5 @@
     </div>
 
     <script type="module" src="popup.js"></script>
-    <script>
-        // Initialize theme on page load
-        document.addEventListener('DOMContentLoaded', function() {
-            chrome.storage.sync.get(['theme'], function(result) {
-                const theme = result.theme || 'dark';
-                document.documentElement.setAttribute('data-theme', theme);
-            });
-        });
-    </script>
 </body>
 </html>

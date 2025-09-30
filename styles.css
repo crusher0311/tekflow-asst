@@ -501,9 +501,44 @@ textarea {
     flex-direction: column;
   }
   
-  button {
+  button:not(#openPromiseDashboardButton) {
     width: 100%;
     margin-right: 0;
+  }
+}
+
+/* Promise Times Button - AGGRESSIVE override to force compact size */
+#openPromiseDashboardButton {
+  width: auto !important;
+  flex-shrink: 0 !important;
+  display: inline-flex !important;
+  min-width: auto !important;
+  max-width: max-content !important;
+  flex-basis: auto !important;
+  flex-grow: 0 !important;
+  align-self: center !important;
+}
+
+/* Keep the Promise Times button container centered and prevent column layout */
+.promise-times-container {
+  justify-content: center !important;
+  align-items: center !important;
+  flex-direction: row !important;
+  width: 100% !important;
+  text-align: center !important;
+}
+
+/* Override ALL responsive rules for Promise Times button */
+@media (max-width: 768px) {
+  .promise-times-container {
+    flex-direction: row !important;
+    justify-content: center !important;
+  }
+  
+  #openPromiseDashboardButton {
+    width: auto !important;
+    max-width: max-content !important;
+    flex: none !important;
   }
 }
 

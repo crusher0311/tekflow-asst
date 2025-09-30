@@ -64,12 +64,13 @@ function createPromiseTimeDashboardContent() {
     dashboardDiv.innerHTML = `
         <div id="dashboard-header">
             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px;">
-                <button id="backToConcernBtn" style="background-color: var(--bg-tertiary); color: var(--text-muted); border: 1px solid var(--border-color); padding: 4px 8px; border-radius: var(--radius); cursor: pointer; transition: all 0.2s; font-size: 11px;" title="Back to concerns">←</button>
+                <button id="backToConcernBtn" style="background-color: var(--bg-tertiary); color: var(--text-muted); border: 1px solid var(--border-color); padding: 6px; border-radius: var(--radius); cursor: pointer; transition: all 0.2s; font-size: 16px; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;" title="Back to concerns">←</button>
                 <h2 style="color: var(--text-primary); margin: 0; font-size: 20px; white-space: nowrap; flex-grow: 1; text-align: center;">Promise Time Dashboard</h2>
-                <button id="testNotificationsBtn" style="background-color: var(--bg-tertiary); color: var(--text-muted); border: 1px solid var(--border-color); padding: 4px 8px; border-radius: var(--radius); cursor: pointer; transition: all 0.2s; font-size: 11px;" title="Test notifications">🔔</button>
+                <button id="testNotificationsBtn" style="background-color: var(--bg-tertiary); color: var(--text-muted); border: 1px solid var(--border-color); padding: 6px; border-radius: var(--radius); cursor: pointer; transition: all 0.2s; font-size: 11px; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;" title="Test notifications">🔔</button>
             </div>
-            <div style="display: flex; justify-content: center; margin-bottom: 20px;">
-                <button id="refreshDashboardBtn" style="background-color: var(--accent-blue); color: white; border: none; padding: 8px 16px; border-radius: var(--radius); cursor: pointer; transition: background-color 0.2s;">🔄 Refresh</button>
+            <div style="display: flex; justify-content: center; gap: 10px; margin-bottom: 20px;">
+                <button id="refreshDashboardBtn" style="background-color: var(--accent-blue); color: white; border: none; padding: 8px 16px; border-radius: var(--radius); cursor: pointer; transition: background-color 0.2s; width: auto; display: inline-flex; align-items: center; gap: 6px;">🔄 Refresh</button>
+                <button id="clearBadgeBtn" style="background-color: var(--accent-red, #f28b82); color: white; border: none; padding: 8px 16px; border-radius: var(--radius); cursor: pointer; transition: background-color 0.2s; width: auto; display: inline-flex; align-items: center; gap: 6px;" title="Clear blinking badge">🚫 Clear Badge</button>
             </div>
             <div id="dashboardCount" style="color: var(--text-muted); margin-bottom: 15px; font-size: 14px;">Loading...</div>
         </div>
@@ -85,6 +86,7 @@ function createPromiseTimeDashboardContent() {
     setTimeout(() => {
         const backBtn = dashboardDiv.querySelector('#backToConcernBtn');
         const refreshBtn = dashboardDiv.querySelector('#refreshDashboardBtn');
+        const clearBadgeBtn = dashboardDiv.querySelector('#clearBadgeBtn');
         const testBtn = dashboardDiv.querySelector('#testNotificationsBtn');
         
         // Add hover effects
@@ -112,11 +114,27 @@ function createPromiseTimeDashboardContent() {
             chrome.runtime.sendMessage({ action: 'refreshPromiseDashboard' });
             loadDashboardData();
         });
+        clearBadgeBtn?.addEventListener('click', () => {
+            // Clear the blinking badge and force recheck
+            chrome.runtime.sendMessage({ action: 'clearBlinkingBadge' }, (response) => {
+                console.log('Clear badge response:', response);
+            });
+            chrome.runtime.sendMessage({ action: 'forceExpiredCheck' }, (response) => {
+                console.log('Force expired check response:', response);
+            });
+            alert('Badge cleared and expired items rechecked!');
+        });
         testBtn?.addEventListener('click', () => {
             // Clear notification tracking and test notifications
             chrome.runtime.sendMessage({ action: 'clearNotificationTracking' }, (response) => {
                 console.log('Notification tracking cleared:', response);
-                alert('Notification tracking cleared! The next dashboard refresh should trigger notifications for promise times under their alert thresholds.');
+                
+                // Also send a test 60-minute notification
+                chrome.runtime.sendMessage({ action: 'testNotification', interval: 60 }, (testResponse) => {
+                    console.log('Test notification response:', testResponse);
+                });
+                
+                alert('Notification tracking cleared and 60-minute test notification sent! Check console for details.');
                 // Force refresh to trigger notifications
                 setTimeout(() => {
                     chrome.runtime.sendMessage({ action: 'refreshPromiseDashboard' });
@@ -385,7 +403,7 @@ function initializePromiseTimeMonitor() {
         if (result.customerTimeOut) {
             updatePromiseTimeDisplay(result);
             // Update every minute
-            setInterval(() => updatePromiseTimeDisplay(result), 60 * 1000);
+            setInterval(() => updatePromiseTimeDisplay(result), 5 * 1000);
         }
     });
 
@@ -501,7 +519,7 @@ function initializePromiseTimeDashboard() {
     });
     
     // Update dashboard every minute
-    setInterval(updateDashboardDisplay, 60000);
+    setInterval(updateDashboardDisplay, 5000);
 }
 
 function updateDashboardDisplay() {

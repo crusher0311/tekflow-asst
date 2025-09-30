@@ -86,13 +86,6 @@
         <button id="snooze-button">Snooze</button>
     </div>
 
-    <script>
-        // Initialize theme
-        chrome.storage.sync.get(['theme'], function(result) {
-            const theme = result.theme || 'dark';
-            document.documentElement.setAttribute('data-theme', theme);
-        });
-    </script>
     <script src="promiseTimePopup.js"></script>
 </body>
 </html>
