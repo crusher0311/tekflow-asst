@@ -5,57 +5,122 @@
     <title>Promise Time Alert - TekFlow Assistant</title>
     <link rel="stylesheet" href="styles.css">
     <style>
+        /* Dark mode color scheme */
+        :root {
+            --bg-primary: #1a1d23;
+            --bg-secondary: #242933;
+            --bg-tertiary: #2d3748;
+            --text-primary: #ffffff;
+            --text-secondary: #a0aec0;
+            --text-muted: #718096;
+            --accent-blue: #3182ce;
+            --accent-red: #f28b82;
+            --border-color: #4a5568;
+            --border-light: #2d3748;
+        }
+
         body {
-            font-family: Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
             text-align: center;
             padding: 20px;
             width: 350px;
             min-height: 250px;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            margin: 0;
         }
+        
         h1 {
             font-size: 18px;
-            color: var(--accent-red, #f28b82);
+            color: var(--accent-red);
             margin-bottom: 15px;
+            margin-top: 0;
         }
+        
         #timer {
             font-size: 24px;
-            color: var(--accent-red, #f28b82);
+            color: var(--accent-red);
             font-weight: bold;
             margin: 15px 0;
         }
+        
         .customer-info {
             text-align: left;
             margin: 15px 0;
-            padding: 10px;
-            background-color: var(--surface-secondary, #f5f5f5);
+            padding: 15px;
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
             border-radius: 8px;
             font-size: 14px;
+            color: var(--text-primary);
         }
+        
         .customer-info p {
-            margin: 5px 0;
+            margin: 8px 0;
+            color: var(--text-primary);
         }
+        
+        .customer-info strong {
+            color: var(--text-primary);
+        }
+        
         .snooze-container {
             margin-top: 15px;
-            padding: 10px;
-            border-top: 1px solid var(--border-color, #ddd);
+            padding: 15px 10px 10px 10px;
+            border-top: 1px solid var(--border-color);
         }
-        .snooze-container select, .snooze-container button {
+        
+        .snooze-container label {
+            color: var(--text-primary);
+            font-weight: 500;
+            margin-bottom: 8px;
+            display: inline-block;
+        }
+        
+        .snooze-container select {
             margin: 5px;
-            padding: 5px 10px;
+            padding: 8px 12px;
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-size: 14px;
         }
+        
+        .snooze-container button {
+            margin: 5px;
+            padding: 8px 16px;
+            background-color: var(--accent-blue);
+            border: none;
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        
+        .snooze-container button:hover {
+            background-color: #2c5282;
+        }
+        
         #repairOrder {
-            color: var(--accent-blue, #4285f4);
+            color: var(--accent-blue);
             text-decoration: none;
             font-weight: bold;
         }
+        
         #repairOrder:hover {
             text-decoration: underline;
+            color: #63b3ed;
         }
+        
         .time-expired {
-            color: var(--accent-red, #ff4444) !important;
+            color: #ff4444 !important;
             font-weight: bold;
             animation: pulse 1s infinite;
         }
+        
         @keyframes pulse {
             0% { opacity: 1; }
             50% { opacity: 0.7; }
