@@ -66,15 +66,13 @@ function createPromiseTimeDashboardContent() {
     
     dashboardDiv.innerHTML = `
         <div id="dashboard-header">
-                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px;">
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    <button id="backToConcernBtn" style="background-color: var(--accent-blue); color: white; border: none; padding: 6px; border-radius: var(--radius); cursor: pointer; transition: background-color 0.2s; font-size: 14px; line-height: 1;">←</button>
-                    <h2 style="color: var(--text-primary); margin: 0; font-size: 18px;">Promise Time Dashboard</h2>
-                </div>
-                <div style="display: flex; gap: 8px;">
-                    <button id="refreshDashboardBtn" style="background-color: var(--accent-green); color: white; border: none; padding: 8px 16px; border-radius: var(--radius); cursor: pointer; transition: background-color 0.2s;">🔄 Refresh</button>
-                    <button id="scanCurrentPageBtn" style="background-color: var(--accent-blue); color: white; border: none; padding: 8px 16px; border-radius: var(--radius); cursor: pointer; transition: background-color 0.2s;">🔍 Scan Current Page</button>
-                </div>
+                        <div style="display: flex; align-items: center; justify-content: flex-start; margin-bottom: 15px;">
+                <button id="backToConcernBtn" style="background-color: var(--accent-blue); color: white; border: none; padding: 6px; border-radius: var(--radius); cursor: pointer; transition: background-color 0.2s; font-size: 14px; line-height: 1; margin-right: 8px;">←</button>
+                <h2 style="color: var(--text-primary); margin: 0; font-size: 18px;">Promise Time Dashboard</h2>
+            </div>
+            <div style="display: flex; gap: 8px; margin-bottom: 20px;">
+                <button id="refreshDashboardBtn" style="background-color: var(--accent-green); color: white; border: none; padding: 8px 16px; border-radius: var(--radius); cursor: pointer; transition: background-color 0.2s;">🔄 Refresh</button>
+                <button id="scanCurrentPageBtn" style="background-color: var(--accent-blue); color: white; border: none; padding: 8px 16px; border-radius: var(--radius); cursor: pointer; transition: background-color 0.2s;">🔍 Scan Current Page</button>
             </div>
             <div id="dashboardCount" style="color: var(--text-muted); margin-bottom: 15px; font-size: 14px;">Loading...</div>
         </div>

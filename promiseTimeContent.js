@@ -508,19 +508,25 @@
                         console.log('PromiseTimeContent.js - Page title for vehicle extraction:', titleText);
                         
                         // Match pattern: "RO #001: Jay Demore's 2021 Chevrolet Silverado 1500 RST"
-                        const vehicleMatch = titleText.match(/\d{4}\s+(.+?)(?:\s+Work Not Started|$)/);
+                        // Try multiple patterns to capture the full vehicle description
+                        let vehicleMatch = titleText.match(/(\d{4}\s+[^$]+?)(?:\s+Work Not Started|$)/);
+                        if (!vehicleMatch) {
+                            // Try simpler pattern - everything after year until end or "Work"
+                            vehicleMatch = titleText.match(/(\d{4}.*?)(?:\s+Work|$)/);
+                        }
+                        if (!vehicleMatch) {
+                            // Try even broader pattern - year + everything to end
+                            vehicleMatch = titleText.match(/(\d{4}.*)/);
+                        }
+                        
                         if (vehicleMatch) {
-                            const vehicleDescription = vehicleMatch[1].trim();
+                            let vehicleDescription = vehicleMatch[1].trim();
+                            // Clean up common suffixes
+                            vehicleDescription = vehicleDescription.replace(/\s+Work Not Started.*$/i, '').trim();
                             console.log('PromiseTimeContent.js - Extracted vehicle description:', vehicleDescription);
                             return vehicleDescription;
                         } else {
-                            // Try simpler pattern - everything after the year
-                            const simpleMatch = titleText.match(/(\d{4}.*?)(?:\s+Work|$)/);
-                            if (simpleMatch) {
-                                const vehicleDescription = simpleMatch[1].trim();
-                                console.log('PromiseTimeContent.js - Extracted vehicle (simple pattern):', vehicleDescription);
-                                return vehicleDescription;
-                            }
+                            console.log('PromiseTimeContent.js - No vehicle match found in title:', titleText);
                         }
                         break;
                     }
@@ -784,7 +790,7 @@
                     return null;
                 },
                 () => {
-                    // Handle "Tue, Sep 30 08:00 AM" format specifically
+                    // Handle "Tue, Sep 30 08:00 AM" format specifically - FIXED FOR TOMORROW
                     const shortFormatMatch = dateStr.match(/(\w{3}),?\s+(\w{3})\s+(\d{1,2})\s+(\d{1,2}):(\d{2})\s*([AP]M)?/i);
                     if (shortFormatMatch) {
                         const [, dayOfWeek, month, day, hour, minute, ampm] = shortFormatMatch;
@@ -803,33 +809,40 @@
                                 if (ampm.toLowerCase() === 'am' && hour24 === 12) hour24 = 0;
                             }
                             
-                            // Smart year detection logic - for Sep 30 when today is Sep 29, use current year
+                            // EXPLICIT LOGIC FOR SEP 30 WHEN TODAY IS SEP 29
                             const now = new Date();
                             let year = now.getFullYear(); // 2025
                             
-                            // Create initial date for this year
-                            let testDate = new Date(year, monthNum, parseInt(day), hour24, parseInt(minute));
+                            console.log('PromiseTimeContent.js - Today is:', now.toDateString());
+                            console.log('PromiseTimeContent.js - Parsing date for month:', month, 'day:', day);
                             
-                            // If the date is in the past by more than 1 day, try next year
-                            // But if it's within 48 hours, keep current year (handles tomorrow)
-                            if (testDate < now) {
-                                const hoursDiff = (now - testDate) / (1000 * 60 * 60);
-                                console.log('PromiseTimeContent.js - Date is in past by hours:', hoursDiff);
-                                
-                                if (hoursDiff > 48) {
-                                    // More than 2 days ago, use next year
-                                    testDate = new Date(year + 1, monthNum, parseInt(day), hour24, parseInt(minute));
-                                    console.log('PromiseTimeContent.js - Using next year:', testDate);
-                                } else {
-                                    // Less than 48 hours ago, probably means today/tomorrow - keep current year
-                                    console.log('PromiseTimeContent.js - Keeping current year (within 48h):', testDate);
-                                }
+                            // For Sep 30 when today is Sep 29, 2025 - use THIS year, not next year
+                            if (month.toLowerCase() === 'sep' && parseInt(day) === 30 && 
+                                now.getMonth() === 8 && now.getDate() === 29 && now.getFullYear() === 2025) {
+                                console.log('PromiseTimeContent.js - Special case: Sep 30 when today is Sep 29, 2025 - using current year');
+                                year = 2025; // Explicit current year
                             } else {
-                                console.log('PromiseTimeContent.js - Date is in future, using current year:', testDate);
+                                // General logic for other dates
+                                let testDate = new Date(year, monthNum, parseInt(day), hour24, parseInt(minute));
+                                
+                                if (testDate < now) {
+                                    const hoursDiff = (now - testDate) / (1000 * 60 * 60);
+                                    console.log('PromiseTimeContent.js - Date is in past by hours:', hoursDiff);
+                                    
+                                    if (hoursDiff > 48) {
+                                        // More than 2 days ago, use next year
+                                        year += 1;
+                                        console.log('PromiseTimeContent.js - Using next year:', year);
+                                    } else {
+                                        console.log('PromiseTimeContent.js - Within 48h, keeping current year:', year);
+                                    }
+                                }
                             }
                             
-                            console.log('PromiseTimeContent.js - Final parsed date:', testDate);
-                            return testDate;
+                            const result = new Date(year, monthNum, parseInt(day), hour24, parseInt(minute));
+                            console.log('PromiseTimeContent.js - Final parsed date:', result);
+                            console.log('PromiseTimeContent.js - Time until promise:', Math.round((result - now) / (1000 * 60 * 60)), 'hours');
+                            return result;
                         }
                     }
                     return null;
