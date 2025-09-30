@@ -230,31 +230,145 @@
     }
 
     function extractPromiseTimeFromPage() {
-        // Look for promise time data in various formats
-        const timeElements = document.querySelectorAll('*');
+        console.log('PromiseTimeContent.js - Extracting promise time from page...');
         
-        for (const el of timeElements) {
-            const text = el.textContent.trim();
-            
-            // Look for datetime patterns
-            const dateTimePatterns = [
-                /\d{1,2}\/\d{1,2}\/\d{4}\s+\d{1,2}:\d{2}\s*(AM|PM)/i,
-                /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/,
-                /\w{3}\s+\w{3}\s+\d{1,2}\s+\d{4}\s+\d{1,2}:\d{2}/
-            ];
-            
-            for (const pattern of dateTimePatterns) {
-                const match = text.match(pattern);
-                if (match) {
-                    const timeOut = new Date(match[0]);
-                    if (!isNaN(timeOut.getTime()) && timeOut > new Date()) {
+        // Strategy 1: Look for existing promise time fields/values
+        const promiseTimeSelectors = [
+            'input[placeholder*="promise" i]',
+            'input[placeholder*="time out" i]', 
+            'input[name*="promise" i]',
+            'input[name*="timeout" i]',
+            '*[data-testid*="promise" i]',
+            '*[data-testid*="timeout" i]'
+        ];
+        
+        for (const selector of promiseTimeSelectors) {
+            const elements = document.querySelectorAll(selector);
+            for (const el of elements) {
+                const value = el.value || el.textContent || el.innerText;
+                console.log(`PromiseTimeContent.js - Checking element with selector "${selector}":`, value);
+                
+                if (value && value.trim()) {
+                    const timeOut = parseDateTime(value.trim());
+                    if (timeOut) {
+                        console.log('PromiseTimeContent.js - Found promise time via input field:', timeOut);
                         return { timeOut: timeOut.toISOString() };
                     }
                 }
             }
         }
         
+        // Strategy 2: Look for text containing date/time patterns near "promise" keywords
+        const allElements = document.querySelectorAll('*');
+        const promiseKeywords = ['promise', 'promised', 'timeout', 'time out', 'due'];
+        
+        for (const el of allElements) {
+            const text = (el.textContent || '').toLowerCase();
+            const hasPromiseKeyword = promiseKeywords.some(keyword => text.includes(keyword));
+            
+            if (hasPromiseKeyword || el.closest('[class*="promise" i]') || el.closest('[class*="timeout" i]')) {
+                // Look for date patterns in this element and nearby elements
+                const datePatterns = [
+                    /\d{1,2}\/\d{1,2}\/\d{4}\s+\d{1,2}:\d{2}(?:\s*[AP]M)?/gi,
+                    /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?(?:\.\d{3})?Z?/gi,
+                    /\w{3}\s+\w{3}\s+\d{1,2}\s+\d{4}\s+\d{1,2}:\d{2}/gi,
+                    /\d{1,2}-\d{1,2}-\d{4}\s+\d{1,2}:\d{2}(?:\s*[AP]M)?/gi
+                ];
+                
+                // Check current element and siblings
+                const elementsToCheck = [el, ...Array.from(el.parentElement?.children || [])];
+                
+                for (const checkEl of elementsToCheck) {
+                    const checkText = checkEl.textContent || checkEl.value || '';
+                    
+                    for (const pattern of datePatterns) {
+                        const matches = checkText.match(pattern);
+                        if (matches) {
+                            for (const match of matches) {
+                                const timeOut = parseDateTime(match);
+                                if (timeOut && timeOut > new Date()) {
+                                    console.log('PromiseTimeContent.js - Found promise time via text pattern:', timeOut);
+                                    return { timeOut: timeOut.toISOString() };
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Strategy 3: Look for any future date/time on the page (less specific)
+        const timeElements = document.querySelectorAll('*');
+        
+        for (const el of timeElements) {
+            const text = el.textContent || el.value || '';
+            if (!text || text.length > 100) continue; // Skip very long text blocks
+            
+            const dateTimePatterns = [
+                /\d{1,2}\/\d{1,2}\/\d{4}\s+\d{1,2}:\d{2}\s*[AP]M/gi,
+                /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/gi,
+                /\w{3}\s+\w{3}\s+\d{1,2}\s+\d{4}\s+\d{1,2}:\d{2}/gi
+            ];
+            
+            for (const pattern of dateTimePatterns) {
+                const matches = text.match(pattern);
+                if (matches) {
+                    for (const match of matches) {
+                        const timeOut = parseDateTime(match);
+                        if (timeOut && timeOut > new Date()) {
+                            // Only consider it if it's within a reasonable timeframe (next 30 days)
+                            const thirtyDaysFromNow = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+                            if (timeOut <= thirtyDaysFromNow) {
+                                console.log('PromiseTimeContent.js - Found potential promise time:', timeOut);
+                                return { timeOut: timeOut.toISOString() };
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        console.log('PromiseTimeContent.js - No promise time found on page');
         return null;
+    }
+
+    // Helper function to parse various date/time formats
+    function parseDateTime(dateStr) {
+        try {
+            // Remove extra whitespace
+            dateStr = dateStr.trim();
+            
+            // Try different parsing approaches
+            const parseAttempts = [
+                () => new Date(dateStr),
+                () => new Date(dateStr.replace(/(\d{1,2})\/(\d{1,2})\/(\d{4})/, '$3-$1-$2')),
+                () => new Date(dateStr.replace(/(\d{1,2})-(\d{1,2})-(\d{4})/, '$3-$1-$2')),
+                () => {
+                    // Handle MM/DD/YYYY HH:MM AM/PM format
+                    const match = dateStr.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})\s*([AP]M)?/i);
+                    if (match) {
+                        const [, month, day, year, hour, minute, ampm] = match;
+                        let hour24 = parseInt(hour);
+                        if (ampm && ampm.toLowerCase() === 'pm' && hour24 !== 12) hour24 += 12;
+                        if (ampm && ampm.toLowerCase() === 'am' && hour24 === 12) hour24 = 0;
+                        return new Date(year, month - 1, day, hour24, minute);
+                    }
+                    return null;
+                }
+            ];
+            
+            for (const attempt of parseAttempts) {
+                const result = attempt();
+                if (result && !isNaN(result.getTime())) {
+                    return result;
+                }
+            }
+            
+            return null;
+        } catch (error) {
+            console.log('PromiseTimeContent.js - Error parsing date:', dateStr, error);
+            return null;
+        }
     }
 
     function extractServiceWriter() {
@@ -282,5 +396,18 @@
     // Auto-start checking when script loads on repair order pages
     if (window.location.href.includes('/repair-orders/')) {
         setTimeout(startCheckInterval, 1000);
+        
+        // Also try to extract promise time data immediately
+        setTimeout(() => {
+            const urlMatch = window.location.href.match(/\/shop\/(\d+)\/repair-orders\/(\d+)/);
+            if (urlMatch) {
+                const shopId = urlMatch[1];
+                const roId = urlMatch[2];
+                console.log('PromiseTimeContent.js - Auto-scanning for promise time data...');
+                extractPromiseTimeDataFromPage(shopId, roId, (response) => {
+                    console.log('PromiseTimeContent.js - Auto-scan result:', response);
+                });
+            }
+        }, 3000); // Wait 3 seconds for page to fully load
     }
 })();
