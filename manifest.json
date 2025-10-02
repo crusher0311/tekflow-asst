@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "TekFlow Assistant",
-  "version": "0.5.1",
-  "description": "Enhanced Tekmetric workflow assistant with customer concern management and promise time monitoring",
+  "version": "1.0.0",
+  "description": "TekFlow SaaS - Professional promise time management for automotive shops with cloud sync and advanced analytics",
   "permissions": [
     "sidePanel",
     "storage",
@@ -28,7 +28,7 @@
   "options_page": "options.html",
   "web_accessible_resources": [
     {
-      "resources": ["styles.css", "images/*", "addAIconcern.js"],
+      "resources": ["styles.css", "images/*", "addAIconcern.js", "apiClient.js", "auth.html"],
       "matches": ["<all_urls>"]
     }
   ],
@@ -36,7 +36,8 @@
     "*://api.openai.com/*",
     "*://firebase.googleapis.com/*",
     "*://firestore.googleapis.com/*",
-    "*://shop.tekmetric.com/*"
+    "*://shop.tekmetric.com/*",
+    "*://localhost:3000/*"
   ],
   "side_panel": {
     "default_path": "sidepanel.html"

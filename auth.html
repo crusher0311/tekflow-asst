@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TekFlow Authentication</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .auth-container {
+            max-width: 400px;
+            margin: 0 auto;
+            padding: 20px;
+            background: var(--bg-secondary);
+            border-radius: var(--radius-lg);
+            border: 1px solid var(--border-light);
+            box-shadow: var(--shadow-lg);
+        }
+        
+        .auth-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .auth-header h1 {
+            color: var(--text-primary);
+            font-size: 24px;
+            margin-bottom: 8px;
+        }
+        
+        .auth-header p {
+            color: var(--text-secondary);
+            font-size: 14px;
+            margin: 0;
+        }
+        
+        .auth-form {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        
+        .form-group label {
+            color: var(--text-primary);
+            font-weight: 500;
+            font-size: 14px;
+        }
+        
+        .form-group input {
+            padding: 12px 16px;
+            background-color: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            color: var(--text-primary);
+            font-size: 14px;
+        }
+        
+        .form-group input:focus {
+            outline: none;
+            border-color: var(--accent-blue);
+            box-shadow: 0 0 0 3px rgba(49, 130, 206, 0.1);
+        }
+        
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+        
+        .auth-button {
+            background-color: var(--accent-blue);
+            color: white;
+            border: none;
+            border-radius: var(--radius);
+            padding: 12px 24px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            margin-top: 8px;
+        }
+        
+        .auth-button:hover {
+            background-color: var(--accent-blue-hover);
+        }
+        
+        .auth-button:disabled {
+            background-color: var(--text-muted);
+            cursor: not-allowed;
+        }
+        
+        .auth-toggle {
+            text-align: center;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border-color);
+        }
+        
+        .auth-toggle button {
+            background: none;
+            border: none;
+            color: var(--accent-blue);
+            text-decoration: underline;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        
+        .auth-toggle button:hover {
+            color: var(--accent-blue-hover);
+        }
+        
+        .error-message {
+            background-color: rgba(220, 38, 38, 0.1);
+            border: 1px solid rgba(220, 38, 38, 0.3);
+            border-radius: var(--radius);
+            padding: 12px;
+            color: #dc2626;
+            font-size: 14px;
+            margin-bottom: 16px;
+        }
+        
+        .success-message {
+            background-color: rgba(56, 161, 105, 0.1);
+            border: 1px solid rgba(56, 161, 105, 0.3);
+            border-radius: var(--radius);
+            padding: 12px;
+            color: var(--accent-green);
+            font-size: 14px;
+            margin-bottom: 16px;
+        }
+        
+        .loading-spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+            margin-right: 8px;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .subscription-banner {
+            background: linear-gradient(135deg, var(--accent-blue), #2c5282);
+            color: white;
+            padding: 16px;
+            border-radius: var(--radius);
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .subscription-banner h3 {
+            margin: 0 0 8px 0;
+            font-size: 16px;
+        }
+        
+        .subscription-banner p {
+            margin: 0;
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        
+        .trial-info {
+            background-color: rgba(255, 167, 38, 0.1);
+            border: 1px solid rgba(255, 167, 38, 0.3);
+            border-radius: var(--radius);
+            padding: 12px;
+            margin-top: 16px;
+            text-align: center;
+        }
+        
+        .trial-info p {
+            margin: 0;
+            color: #f59e0b;
+            font-size: 14px;
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+    <div class="auth-container">
+        <!-- Subscription Banner -->
+        <div class="subscription-banner" id="subscriptionBanner" style="display: none;">
+            <h3>🚀 Welcome to TekFlow Pro!</h3>
+            <p>Get advanced promise time management for your automotive shop</p>
+        </div>
+        
+        <!-- Auth Header -->
+        <div class="auth-header">
+            <h1 id="authTitle">Welcome to TekFlow</h1>
+            <p id="authSubtitle">Sign in to manage your promise times</p>
+        </div>
+        
+        <!-- Error/Success Messages -->
+        <div id="errorMessage" class="error-message" style="display: none;"></div>
+        <div id="successMessage" class="success-message" style="display: none;"></div>
+        
+        <!-- Login Form -->
+        <form id="loginForm" class="auth-form">
+            <div class="form-group">
+                <label for="loginEmail">Email Address</label>
+                <input type="email" id="loginEmail" required>
+            </div>
+            <div class="form-group">
+                <label for="loginPassword">Password</label>
+                <input type="password" id="loginPassword" required>
+            </div>
+            <button type="submit" class="auth-button" id="loginButton">
+                Sign In
+            </button>
+        </form>
+        
+        <!-- Registration Form -->
+        <form id="registerForm" class="auth-form" style="display: none;">
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="registerFirstName">First Name</label>
+                    <input type="text" id="registerFirstName" required>
+                </div>
+                <div class="form-group">
+                    <label for="registerLastName">Last Name</label>
+                    <input type="text" id="registerLastName" required>
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="registerEmail">Email Address</label>
+                <input type="email" id="registerEmail" required>
+            </div>
+            <div class="form-group">
+                <label for="registerShopName">Shop Name (Optional)</label>
+                <input type="text" id="registerShopName">
+            </div>
+            <div class="form-group">
+                <label for="registerPassword">Password</label>
+                <input type="password" id="registerPassword" required>
+            </div>
+            <div class="form-group">
+                <label for="registerConfirmPassword">Confirm Password</label>
+                <input type="password" id="registerConfirmPassword" required>
+            </div>
+            <button type="submit" class="auth-button" id="registerButton">
+                Create Account
+            </button>
+            
+            <div class="trial-info">
+                <p>🎁 Start your 14-day free trial today!</p>
+            </div>
+        </form>
+        
+        <!-- Toggle between login/register -->
+        <div class="auth-toggle">
+            <p id="toggleText">Don't have an account?</p>
+            <button type="button" id="toggleAuth">Create one here</button>
+        </div>
+    </div>
+
+    <script src="apiClient.js"></script>
+    <script>
+        let isLoginMode = true;
+        
+        // DOM Elements
+        const loginForm = document.getElementById('loginForm');
+        const registerForm = document.getElementById('registerForm');
+        const authTitle = document.getElementById('authTitle');
+        const authSubtitle = document.getElementById('authSubtitle');
+        const toggleText = document.getElementById('toggleText');
+        const toggleAuth = document.getElementById('toggleAuth');
+        const errorMessage = document.getElementById('errorMessage');
+        const successMessage = document.getElementById('successMessage');
+        const loginButton = document.getElementById('loginButton');
+        const registerButton = document.getElementById('registerButton');
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            setupEventListeners();
+            checkAuthentication();
+        });
+        
+        function setupEventListeners() {
+            loginForm.addEventListener('submit', handleLogin);
+            registerForm.addEventListener('submit', handleRegister);
+            toggleAuth.addEventListener('click', toggleAuthMode);
+        }
+        
+        async function checkAuthentication() {
+            const api = window.TekFlowAPI;
+            if (api.isAuthenticated()) {
+                const result = await api.verifyToken();
+                if (result.success) {
+                    // User is authenticated, redirect to main extension
+                    window.location.href = 'sidepanel.html';
+                }
+            }
+        }
+        
+        async function handleLogin(e) {
+            e.preventDefault();
+            
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPassword').value;
+            
+            if (!email || !password) {
+                showError('Please fill in all fields');
+                return;
+            }
+            
+            setLoading(loginButton, true);
+            hideMessages();
+            
+            const api = window.TekFlowAPI;
+            const result = await api.login(email, password);
+            
+            setLoading(loginButton, false);
+            
+            if (result.success) {
+                showSuccess('Login successful! Redirecting...');
+                setTimeout(() => {
+                    window.location.href = 'sidepanel.html';
+                }, 1500);
+            } else {
+                showError(result.error);
+            }
+        }
+        
+        async function handleRegister(e) {
+            e.preventDefault();
+            
+            const firstName = document.getElementById('registerFirstName').value;
+            const lastName = document.getElementById('registerLastName').value;
+            const email = document.getElementById('registerEmail').value;
+            const shopName = document.getElementById('registerShopName').value;
+            const password = document.getElementById('registerPassword').value;
+            const confirmPassword = document.getElementById('registerConfirmPassword').value;
+            
+            if (!firstName || !lastName || !email || !password || !confirmPassword) {
+                showError('Please fill in all required fields');
+                return;
+            }
+            
+            if (password !== confirmPassword) {
+                showError('Passwords do not match');
+                return;
+            }
+            
+            if (password.length < 8) {
+                showError('Password must be at least 8 characters long');
+                return;
+            }
+            
+            setLoading(registerButton, true);
+            hideMessages();
+            
+            const api = window.TekFlowAPI;
+            const result = await api.register({
+                firstName,
+                lastName,
+                email,
+                shopName,
+                password
+            });
+            
+            setLoading(registerButton, false);
+            
+            if (result.success) {
+                showSuccess('Registration successful! Starting your free trial...');
+                setTimeout(() => {
+                    window.location.href = 'sidepanel.html';
+                }, 1500);
+            } else {
+                showError(result.error);
+            }
+        }
+        
+        function toggleAuthMode() {
+            isLoginMode = !isLoginMode;
+            
+            if (isLoginMode) {
+                loginForm.style.display = 'flex';
+                registerForm.style.display = 'none';
+                authTitle.textContent = 'Welcome Back';
+                authSubtitle.textContent = 'Sign in to manage your promise times';
+                toggleText.textContent = "Don't have an account?";
+                toggleAuth.textContent = 'Create one here';
+            } else {
+                loginForm.style.display = 'none';
+                registerForm.style.display = 'flex';
+                authTitle.textContent = 'Join TekFlow';
+                authSubtitle.textContent = 'Start your free trial today';
+                toggleText.textContent = 'Already have an account?';
+                toggleAuth.textContent = 'Sign in here';
+            }
+            
+            hideMessages();
+        }
+        
+        function setLoading(button, loading) {
+            if (loading) {
+                button.disabled = true;
+                button.innerHTML = '<span class="loading-spinner"></span>Processing...';
+            } else {
+                button.disabled = false;
+                button.innerHTML = isLoginMode ? 'Sign In' : 'Create Account';
+            }
+        }
+        
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorMessage.style.display = 'block';
+            successMessage.style.display = 'none';
+        }
+        
+        function showSuccess(message) {
+            successMessage.textContent = message;
+            successMessage.style.display = 'block';
+            errorMessage.style.display = 'none';
+        }
+        
+        function hideMessages() {
+            errorMessage.style.display = 'none';
+            successMessage.style.display = 'none';
+        }
+    </script>
+</body>
+</html>

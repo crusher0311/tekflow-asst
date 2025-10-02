@@ -1,8 +1,88 @@
-chrome.runtime.onInstalled.addListener(() => {
+/**
+ * TekFlow SaaS Background Service Worker
+ * Handles promise time monitoring with cloud sync and subscription management
+ */
+
+// Initialize TekFlow API client
+let tekflowAPI = null;
+let isAuthenticated = false;
+let userFeatures = {};
+
+// Initialize on startup
+chrome.runtime.onStartup.addListener(async () => {
+    await initializeTekFlow();
+});
+
+chrome.runtime.onInstalled.addListener(async () => {
     chrome.sidePanel.setPanelBehavior({
         openPanelOnActionClick: true
     }).catch((error) => console.error("Failed to set panel behavior:", error));
+    
+    // Initialize TekFlow API
+    await initializeTekFlow();
 });
+
+async function initializeTekFlow() {
+    try {
+        // Load API client
+        await loadTekFlowAPI();
+        
+        // Check authentication
+        await checkAuthentication();
+        
+        // Load user features if authenticated
+        if (isAuthenticated) {
+            await loadUserFeatures();
+        }
+        
+        console.log('TekFlow background service initialized');
+    } catch (error) {
+        console.error('Error initializing TekFlow:', error);
+    }
+}
+
+async function loadTekFlowAPI() {
+    // Import API client (since we can't use ES6 modules in service worker)
+    try {
+        const response = await fetch(chrome.runtime.getURL('apiClient.js'));
+        const apiClientCode = await response.text();
+        eval(apiClientCode);
+        tekflowAPI = new TekFlowAPI();
+    } catch (error) {
+        console.error('Error loading TekFlow API:', error);
+    }
+}
+
+async function checkAuthentication() {
+    if (!tekflowAPI) return false;
+    
+    isAuthenticated = tekflowAPI.isAuthenticated();
+    
+    if (isAuthenticated) {
+        const result = await tekflowAPI.verifyToken();
+        isAuthenticated = result.success;
+        
+        if (!isAuthenticated) {
+            console.log('Token verification failed, user needs to re-authenticate');
+        }
+    }
+    
+    return isAuthenticated;
+}
+
+async function loadUserFeatures() {
+    if (!tekflowAPI || !isAuthenticated) return;
+    
+    try {
+        const result = await tekflowAPI.getFeatureFlags();
+        if (result.success) {
+            userFeatures = result.data.features;
+            console.log('User features loaded:', userFeatures);
+        }
+    } catch (error) {
+        console.error('Error loading user features:', error);
+    }
+}
 
 chrome.action.onClicked.addListener(() => {
     chrome.windows.getCurrent({populate: true}, (currentWindow) => {
@@ -527,8 +607,23 @@ function checkForPromiseTimeNotifications(activePromises) {
 }
 
 // Show Promise Time notification
-function showPromiseTimeNotification(promise, minutesRemaining) {
+async function showPromiseTimeNotification(promise, minutesRemaining) {
     console.log(`Background.js - showPromiseTimeNotification called for RO ${promise.repairOrderNumber}: ${minutesRemaining} minutes`);
+    
+    // Check authentication and subscription before showing alerts
+    if (!await checkSubscriptionAccess('basicAlerts')) {
+        console.log('Basic alerts feature not available - subscription required');
+        return;
+    }
+    
+    // Track usage
+    if (tekflowAPI && isAuthenticated) {
+        await tekflowAPI.trackUsage('alert_triggered', {
+            repairOrderNumber: promise.repairOrderNumber,
+            minutesRemaining,
+            alertType: 'notification'
+        });
+    }
     
     const title = `Promise Time Alert - RO #${promise.repairOrderNumber}`;
     let message;
@@ -768,6 +863,21 @@ function setBlinkingHazardBadge(expiredCount) {
 // Start checking for expired items every 5 seconds
 setInterval(checkExpiredPromiseTimes, 5000);
 
+// Subscription and feature checking
+async function checkSubscriptionAccess(featureName) {
+    if (!isAuthenticated) {
+        console.log('User not authenticated, denying access to', featureName);
+        return false;
+    }
+    
+    if (!userFeatures[featureName]) {
+        console.log(`Feature '${featureName}' not available for current subscription`);
+        return false;
+    }
+    
+    return true;
+}
+
 // Listen for changes to promise time data and immediately recheck expired items
 chrome.storage.onChanged.addListener((changes, namespace) => {
     if (namespace === 'local' && changes.promiseTimeDashboardData) {
@@ -778,12 +888,21 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
 });
 
 // Force initial check when background script starts
-setTimeout(checkExpiredPromiseTimes, 1000);
+setTimeout(async () => {
+    await initializeTekFlow(); // Ensure API is ready
+    checkExpiredPromiseTimes();
+}, 1000);
 
 // Create visible alert popup for critical notifications
 let activePopups = new Set(); // Track active popup windows by RO ID
 
-function createAlertPopup(promise, minutesRemaining) {
+async function createAlertPopup(promise, minutesRemaining) {
+    // Check subscription access before creating popups
+    if (!await checkSubscriptionAccess('basicAlerts')) {
+        console.log('Popup alerts not available - subscription required');
+        return;
+    }
+    
     const popupKey = `${promise.roId}_${minutesRemaining}`;
     
     // Prevent duplicate popups for the same RO and interval
@@ -794,6 +913,15 @@ function createAlertPopup(promise, minutesRemaining) {
     
     activePopups.add(popupKey);
     console.log(`Background.js - Creating alert popup for RO ${promise.repairOrderNumber}: ${minutesRemaining} minutes`);
+    
+    // Track usage
+    if (tekflowAPI && isAuthenticated) {
+        await tekflowAPI.trackUsage('alert_triggered', {
+            repairOrderNumber: promise.repairOrderNumber,
+            minutesRemaining,
+            alertType: 'popup'
+        });
+    }
     
     // Auto-cleanup: remove from activePopups after 5 minutes to prevent memory leaks
     setTimeout(() => {
